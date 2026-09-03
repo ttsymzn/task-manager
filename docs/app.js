@@ -1062,10 +1062,12 @@ els.mobSearch.addEventListener('click', () => {
   if (state.editingId) {
     exitEditMode();
     setMessage('');
+    els.input.blur();
   } else if (!els.searchline.classList.contains('hidden')) {
     state.searchQuery = '';
     els.searchInput.value = '';
     els.searchline.classList.add('hidden');
+    els.searchInput.blur();
     render();
   } else {
     els.searchline.classList.remove('hidden');
