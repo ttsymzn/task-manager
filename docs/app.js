@@ -428,6 +428,8 @@ function render() {
     els.mobCountPending.textContent = `(${pending.length})`;
     els.mobCountArchived.textContent = `(${archived.length})`;
     els.mobEdit.textContent = state.editingId ? '保存' : 'edit';
+    const inSearch = !els.searchline.classList.contains('hidden');
+    els.mobSearch.textContent = (state.editingId || inSearch) ? 'Esc' : '/';
   }
 
   return { pending, archived };
@@ -1057,8 +1059,18 @@ els.mobDelete.addEventListener('click', () => {
 });
 
 els.mobSearch.addEventListener('click', () => {
-  els.searchline.classList.remove('hidden');
-  els.searchInput.focus();
+  if (state.editingId) {
+    exitEditMode();
+    setMessage('');
+  } else if (!els.searchline.classList.contains('hidden')) {
+    state.searchQuery = '';
+    els.searchInput.value = '';
+    els.searchline.classList.add('hidden');
+    render();
+  } else {
+    els.searchline.classList.remove('hidden');
+    els.searchInput.focus();
+  }
 });
 
 renderInputBackdrop();
