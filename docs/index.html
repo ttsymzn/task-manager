@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>task-manager :: terminal</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="auth-screen" id="auth-screen">
+    <div class="auth-box">
+      <div class="auth-title">$ ~/task-manager/login</div>
+      <div class="auth-sub" id="auth-sub">メールアドレスとパスワードでログインしてください。どの端末からでも同じアカウントでログインすれば、同じタスクにアクセスできます。</div>
+      <div class="auth-row">
+        <label for="auth-email">email</label>
+        <input id="auth-email" type="email" autocomplete="username" spellcheck="false">
+      </div>
+      <div class="auth-row">
+        <label for="auth-password">password</label>
+        <input id="auth-password" type="password" autocomplete="current-password">
+      </div>
+      <div class="auth-actions">
+        <button type="button" id="auth-submit-btn" class="tool-btn">ログイン</button>
+      </div>
+      <div class="auth-msg" id="auth-msg"></div>
+      <div class="auth-toggle">
+        アカウントをお持ちでない場合は <a id="auth-mode-toggle">新規登録</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="term hidden" id="app-root">
+    <div class="pane pane-top">
+      <div class="pane-header">
+        <span>$ ~/task-manager <span id="edit-flag" class="edit-flag hidden">-- EDIT MODE (Esc でキャンセル)</span></span>
+        <span class="user-badge"><span id="user-email"></span><button type="button" id="logout-btn" class="tool-btn small">ログアウト</button></span>
+      </div>
+      <div class="pane-body">
+        <div class="help">
+usage: &lt;タスク名...&gt; [-t &lt;タグ&gt;] [-d &lt;YYYYMMDD&gt;] [-h &lt;HHMM&gt;] [所要時間h]
+example: ミーティング会議 -t 会議 -d 20260903 -h 1000 0.5
+省略時デフォルト: タグ=なし / 日付=当日 / 時刻=現在時刻 / 所要時間=0
+keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  a アーカイブ切替  / 検索  Esc 入力欄を離れる/編集キャンセル/検索解除
+編集中はメモ欄が使用できます (Ctrl+Enter で保存)
+テキストスパンディング: 例) ;todo と入力すると [ ] に自動展開(snippetsボタンで作成・編集、複数行の展開文字列にも対応)
+        </div>
+        <div class="cmdline">
+          <span class="prompt" id="prompt">$</span>
+          <div class="input-wrap">
+            <div class="input-backdrop" id="input-backdrop"></div>
+            <input id="command-input" type="text" autocomplete="off" spellcheck="false" placeholder="タスクを入力... 例) 資料作成 -t 作業 -d 20260905 -h 1400 1.5">
+          </div>
+        </div>
+        <div class="memo-section hidden" id="memo-section">
+          <div class="memo-label"># memo</div>
+          <div class="memo-wrap">
+            <div class="memo-backdrop" id="memo-backdrop"></div>
+            <textarea id="memo-input" rows="10" spellcheck="false" placeholder="メモを入力... (Ctrl+Enter で保存)"></textarea>
+          </div>
+        </div>
+        <div class="searchline hidden" id="searchline">
+          <span class="prompt">/</span>
+          <input id="search-input" type="text" autocomplete="off" spellcheck="false" placeholder="検索(タスク名・タグ・メモ)... Enterで確定 Escで解除">
+          <span class="search-status" id="search-status"></span>
+        </div>
+        <div class="toolbar">
+          <span class="prompt">#</span>
+          <button type="button" id="csv-export-btn" class="tool-btn">csv export</button>
+          <button type="button" id="csv-import-btn" class="tool-btn">csv import</button>
+          <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden">
+          <button type="button" id="snippets-btn" class="tool-btn">snippets</button>
+        </div>
+        <div class="snippets-panel hidden" id="snippets-panel">
+          <div class="snippets-help">空白の直後にトリガー文字列を入力すると、展開文字列(複数行可)に自動で置き換わります。</div>
+          <div class="snippets-list" id="snippets-list"></div>
+          <div class="snippets-form">
+            <div class="snippets-form-title" id="snippets-form-title"># 新規作成</div>
+            <div class="snippets-form-row">
+              <label for="snippet-trigger-input">トリガー</label>
+              <input id="snippet-trigger-input" type="text" autocomplete="off" spellcheck="false" placeholder="例) ;todo">
+            </div>
+            <div class="snippets-form-row">
+              <label for="snippet-expansion-input">展開文字列(複数行可)</label>
+              <textarea id="snippet-expansion-input" rows="4" spellcheck="false" placeholder="例)&#10;[ ] &#10;担当:&#10;期限:"></textarea>
+            </div>
+            <div class="snippets-actions">
+              <button type="button" id="snippet-save-btn" class="tool-btn">保存</button>
+              <button type="button" id="snippet-new-btn" class="tool-btn">新規作成にリセット</button>
+              <button type="button" id="snippets-close-btn" class="tool-btn">閉じる</button>
+            </div>
+          </div>
+        </div>
+        <div class="msg" id="msg"></div>
+      </div>
+    </div>
+    <div class="pane-row">
+      <div class="pane pane-bottom" id="pane-pending">
+        <div class="pane-header"># pending_tasks <span class="count" id="pending-count">(0)</span></div>
+        <div class="pane-body list" id="pending-list"></div>
+      </div>
+      <div class="pane pane-bottom" id="pane-archived">
+        <div class="pane-header"># archived_tasks <span class="count" id="archived-count">(0)</span></div>
+        <div class="pane-body list" id="archived-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
