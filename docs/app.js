@@ -391,9 +391,7 @@ function renderList(container, tasks, paneName, isPending) {
     row.addEventListener('click', () => {
       state.activePane = paneName;
       state.selectedIndex = idx;
-      if (isMobile()) {
-        els.input.focus();
-      } else {
+      if (!isMobile()) {
         els.input.blur();
       }
       render();
@@ -1028,7 +1026,6 @@ els.mobUp.addEventListener('click', () => {
   render();
   const list = state.activePane === 'pending' ? els.pendingList : els.archivedList;
   list.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
-  els.input.focus();
 });
 
 els.mobDown.addEventListener('click', () => {
@@ -1038,7 +1035,6 @@ els.mobDown.addEventListener('click', () => {
   render();
   const list = state.activePane === 'pending' ? els.pendingList : els.archivedList;
   list.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
-  els.input.focus();
 });
 
 els.mobEdit.addEventListener('click', () => {
