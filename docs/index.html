@@ -93,6 +93,10 @@ keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  
         <div class="msg" id="msg"></div>
       </div>
     </div>
+    <div class="mobile-pane-tabs" id="mobile-pane-tabs">
+      <button type="button" id="mobile-tab-pending" class="mobile-tab active"># pending <span id="mobile-count-pending">(0)</span></button>
+      <button type="button" id="mobile-tab-archived" class="mobile-tab"># archived <span id="mobile-count-archived">(0)</span></button>
+    </div>
     <div class="pane-row">
       <div class="pane pane-bottom" id="pane-pending">
         <div class="pane-header"># pending_tasks <span class="count" id="pending-count">(0)</span></div>
@@ -102,6 +106,14 @@ keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  
         <div class="pane-header"># archived_tasks <span class="count" id="archived-count">(0)</span></div>
         <div class="pane-body list" id="archived-list"></div>
       </div>
+    </div>
+    <div class="mobile-toolbar" id="mobile-toolbar">
+      <button type="button" id="mob-up" class="mob-btn">▲</button>
+      <button type="button" id="mob-down" class="mob-btn">▼</button>
+      <button type="button" id="mob-edit" class="mob-btn">edit</button>
+      <button type="button" id="mob-archive" class="mob-btn">arch</button>
+      <button type="button" id="mob-delete" class="mob-btn mob-danger">del</button>
+      <button type="button" id="mob-search" class="mob-btn">/</button>
     </div>
   </div>
 

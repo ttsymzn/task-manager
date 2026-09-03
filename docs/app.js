@@ -42,6 +42,16 @@ const els = {
   searchline: document.getElementById('searchline'),
   searchInput: document.getElementById('search-input'),
   searchStatus: document.getElementById('search-status'),
+  mobTabPending: document.getElementById('mobile-tab-pending'),
+  mobTabArchived: document.getElementById('mobile-tab-archived'),
+  mobCountPending: document.getElementById('mobile-count-pending'),
+  mobCountArchived: document.getElementById('mobile-count-archived'),
+  mobUp: document.getElementById('mob-up'),
+  mobDown: document.getElementById('mob-down'),
+  mobEdit: document.getElementById('mob-edit'),
+  mobArchive: document.getElementById('mob-archive'),
+  mobDelete: document.getElementById('mob-delete'),
+  mobSearch: document.getElementById('mob-search'),
   csvExportBtn: document.getElementById('csv-export-btn'),
   csvImportBtn: document.getElementById('csv-import-btn'),
   csvFileInput: document.getElementById('csv-file-input'),
@@ -410,6 +420,16 @@ function render() {
     els.searchStatus.textContent = `${pending.length + archived.length}件ヒット`;
   } else {
     els.searchStatus.textContent = '';
+  }
+
+  if (isMobile()) {
+    els.panePending.classList.toggle('mobile-visible', state.activePane === 'pending');
+    els.paneArchived.classList.toggle('mobile-visible', state.activePane === 'archived');
+    els.mobTabPending.classList.toggle('active', state.activePane === 'pending');
+    els.mobTabArchived.classList.toggle('active', state.activePane === 'archived');
+    els.mobCountPending.textContent = `(${pending.length})`;
+    els.mobCountArchived.textContent = `(${archived.length})`;
+    els.mobEdit.textContent = state.editingId ? '保存' : 'edit';
   }
 
   return { pending, archived };
@@ -985,6 +1005,64 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
     els.input.focus();
   }
+});
+
+// =========================================================
+// モバイルツールバー
+// =========================================================
+
+els.mobTabPending.addEventListener('click', () => {
+  state.activePane = 'pending';
+  render();
+});
+
+els.mobTabArchived.addEventListener('click', () => {
+  state.activePane = 'archived';
+  render();
+});
+
+els.mobUp.addEventListener('click', () => {
+  const { pending, archived } = splitTasks();
+  const len = state.activePane === 'pending' ? pending.length : archived.length;
+  state.selectedIndex = clamp(state.selectedIndex - 1, len);
+  render();
+  const list = state.activePane === 'pending' ? els.pendingList : els.archivedList;
+  list.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
+  els.input.focus();
+});
+
+els.mobDown.addEventListener('click', () => {
+  const { pending, archived } = splitTasks();
+  const len = state.activePane === 'pending' ? pending.length : archived.length;
+  state.selectedIndex = clamp(state.selectedIndex + 1, len);
+  render();
+  const list = state.activePane === 'pending' ? els.pendingList : els.archivedList;
+  list.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
+  els.input.focus();
+});
+
+els.mobEdit.addEventListener('click', () => {
+  if (state.editingId) {
+    submitCommand();
+  } else {
+    const task = currentSelectedTask();
+    if (task) enterEditMode(task);
+  }
+});
+
+els.mobArchive.addEventListener('click', () => {
+  const task = currentSelectedTask();
+  if (task) toggleArchive(task);
+});
+
+els.mobDelete.addEventListener('click', () => {
+  const task = currentSelectedTask();
+  if (task && confirm(`削除しますか?\n"${task.title}"`)) deleteTask(task);
+});
+
+els.mobSearch.addEventListener('click', () => {
+  els.searchline.classList.remove('hidden');
+  els.searchInput.focus();
 });
 
 renderInputBackdrop();

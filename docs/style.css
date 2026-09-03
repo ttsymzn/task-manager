@@ -561,3 +561,87 @@ mark.hit {
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track { background: var(--pane-bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+
+/* =========================================================
+   Mobile UI (touch devices only)
+   ========================================================= */
+.mobile-pane-tabs,
+.mobile-toolbar { display: none; }
+
+@media (pointer: coarse) {
+  .help { display: none; }
+
+  .pane-row { flex-direction: column; }
+
+  #pane-pending,
+  #pane-archived { display: none; }
+
+  #pane-pending.mobile-visible,
+  #pane-archived.mobile-visible { display: flex; }
+
+  .mobile-pane-tabs {
+    display: flex;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--pane-bg);
+  }
+
+  .mobile-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--fg-dim);
+    font: inherit;
+    font-size: 13px;
+    padding: 9px 6px;
+    cursor: pointer;
+    text-align: center;
+    touch-action: manipulation;
+  }
+
+  .mobile-tab:last-child { border-right: none; }
+
+  .mobile-tab.active {
+    color: var(--accent);
+    background: var(--select-bg);
+  }
+
+  .mobile-toolbar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--pane-bg);
+    border-top: 1px solid var(--border);
+    padding: 8px;
+    gap: 6px;
+    z-index: 100;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
+  }
+
+  .mob-btn {
+    flex: 1;
+    background: #050603;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--accent);
+    font: inherit;
+    font-size: 13px;
+    padding: 10px 2px;
+    cursor: pointer;
+    min-width: 0;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mob-btn:active { background: rgba(125, 255, 179, 0.15); }
+
+  .mob-danger { color: var(--red); border-color: #5c3030; }
+  .mob-danger:active { background: rgba(255, 92, 87, 0.15); }
+
+  .term { padding-bottom: 68px; }
+}
