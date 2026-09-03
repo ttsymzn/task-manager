@@ -1,6 +1,10 @@
 // ---- Supabase クライアント初期化 ----
 const sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 
+function isMobile() {
+  return window.matchMedia('(pointer: coarse)').matches;
+}
+
 const state = {
   tasks: [],
   editingId: null,
@@ -377,7 +381,11 @@ function renderList(container, tasks, paneName, isPending) {
     row.addEventListener('click', () => {
       state.activePane = paneName;
       state.selectedIndex = idx;
-      els.input.blur();
+      if (isMobile()) {
+        els.input.focus();
+      } else {
+        els.input.blur();
+      }
       render();
     });
     container.appendChild(row);
