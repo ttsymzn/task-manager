@@ -672,6 +672,7 @@ function enterEditMode(task) {
   setMessage('');
   renderInputBackdrop();
   renderMemoBackdrop();
+  render();
 
   const query = state.searchQuery;
   if (query) {
@@ -703,6 +704,7 @@ function exitEditMode() {
   els.memoInput.value = '';
   renderInputBackdrop();
   renderMemoBackdrop();
+  render();
 }
 
 // =========================================================
