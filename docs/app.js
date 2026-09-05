@@ -432,6 +432,7 @@ function render() {
     els.mobCountPending.textContent = `(${pending.length})`;
     els.mobCountArchived.textContent = `(${archived.length})`;
     els.mobEdit.textContent = state.editingId ? '保存' : 'edit';
+    els.mobArchive.textContent = state.activePane === 'archived' ? 'pend' : 'arch';
     const inSearch = !els.searchline.classList.contains('hidden');
     els.mobSearch.textContent = (state.editingId || inSearch) ? 'Esc' : '/';
   }
