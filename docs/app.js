@@ -147,6 +147,7 @@ function showApp(session) {
   els.userEmail.textContent = session.user.email;
   subscribeRealtime(session.user.id);
   fetchTasks();
+  fetchSnippets();
   els.input.focus();
 }
 
@@ -540,29 +541,40 @@ async function deleteTask(task) {
 }
 
 // =========================================================
-// テキストスパンディング (localStorage、端末ごとの設定)
+// テキストスパンディング (Supabase DB、全端末で共有)
 // =========================================================
 
-function loadSnippets() {
-  try {
-    const raw = localStorage.getItem('snippets');
-    if (raw === null) {
-      const defaults = { ';todo': '[ ]', ';done': '[x]' };
-      localStorage.setItem('snippets', JSON.stringify(defaults));
-      return defaults;
-    }
-    return JSON.parse(raw);
-  } catch (err) {
-    return {};
-  }
-}
-
-function saveSnippets(map) {
-  localStorage.setItem('snippets', JSON.stringify(map));
-}
-
-let snippets = loadSnippets();
+let snippets = {};
 let editingSnippetTrigger = null;
+
+async function fetchSnippets() {
+  const { data, error } = await sbClient.from('snippets').select('trigger, expansion');
+  if (error) { setMessage(`error: ${error.message}`, 'error'); return; }
+  snippets = {};
+  for (const row of data) snippets[row.trigger] = row.expansion;
+  renderSnippetsList();
+}
+
+async function saveSnippet(trig, expansion, oldTrig) {
+  if (oldTrig && oldTrig !== trig) {
+    await sbClient.from('snippets').delete().eq('trigger', oldTrig);
+    const { error } = await sbClient.from('snippets').insert({ trigger: trig, expansion });
+    if (error) { setMessage(`error: ${error.message}`, 'error'); return; }
+  } else if (Object.prototype.hasOwnProperty.call(snippets, trig)) {
+    const { error } = await sbClient.from('snippets').update({ expansion }).eq('trigger', trig);
+    if (error) { setMessage(`error: ${error.message}`, 'error'); return; }
+  } else {
+    const { error } = await sbClient.from('snippets').insert({ trigger: trig, expansion });
+    if (error) { setMessage(`error: ${error.message}`, 'error'); return; }
+  }
+  await fetchSnippets();
+}
+
+async function deleteSnippet(trig) {
+  const { error } = await sbClient.from('snippets').delete().eq('trigger', trig);
+  if (error) { setMessage(`error: ${error.message}`, 'error'); return; }
+  await fetchSnippets();
+}
 
 function resetSnippetForm() {
   editingSnippetTrigger = null;
@@ -613,11 +625,9 @@ function renderSnippetsList() {
     delBtn.type = 'button';
     delBtn.className = 'tool-btn small';
     delBtn.textContent = '削除';
-    delBtn.addEventListener('click', () => {
-      delete snippets[trig];
-      saveSnippets(snippets);
-      renderSnippetsList();
+    delBtn.addEventListener('click', async () => {
       if (editingSnippetTrigger === trig) resetSnippetForm();
+      await deleteSnippet(trig);
       setMessage(`snippet deleted: ${trig}`, 'ok');
     });
 
@@ -868,20 +878,16 @@ els.snippetsBtn.addEventListener('click', () => {
     resetSnippetForm();
   }
 });
-els.snippetSaveBtn.addEventListener('click', () => {
+els.snippetSaveBtn.addEventListener('click', async () => {
   const trig = els.snippetTriggerInput.value.trim();
   const expansion = els.snippetExpansionInput.value;
   if (!trig) {
     setMessage('error: トリガーを入力してください', 'error');
     return;
   }
-  if (editingSnippetTrigger && editingSnippetTrigger !== trig) {
-    delete snippets[editingSnippetTrigger];
-  }
-  snippets[trig] = expansion;
-  saveSnippets(snippets);
-  renderSnippetsList();
+  const oldTrig = editingSnippetTrigger;
   resetSnippetForm();
+  await saveSnippet(trig, expansion, oldTrig);
   setMessage(`snippet saved: ${trig}`, 'ok');
 });
 els.snippetNewBtn.addEventListener('click', resetSnippetForm);
