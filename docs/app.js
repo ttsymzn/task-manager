@@ -307,14 +307,7 @@ function taskMatches(task, query) {
 }
 
 function compareTasks(a, b) {
-  return (
-    a.title.localeCompare(b.title, 'ja')
-    || (a.tag || '').localeCompare(b.tag || '', 'ja')
-    || a.date_str.localeCompare(b.date_str)
-    || a.time_str.localeCompare(b.time_str)
-    || new Date(a.created_at) - new Date(b.created_at)
-    || new Date(a.updated_at) - new Date(b.updated_at)
-  );
+  return new Date(a.created_at) - new Date(b.created_at);
 }
 
 function splitTasks() {
@@ -369,10 +362,6 @@ function renderList(container, tasks, paneName, isPending) {
     cursor.className = 'cursor';
     cursor.textContent = (state.activePane === paneName && state.selectedIndex === idx) ? '>' : '';
 
-    const time = document.createElement('span');
-    time.className = 'time';
-    time.textContent = `${formatTime(task)}-${endTimeStr(task)}`;
-
     const title = document.createElement('span');
     title.className = 'title';
     appendHighlighted(title, task.title, state.searchQuery);
@@ -388,6 +377,10 @@ function renderList(container, tasks, paneName, isPending) {
     date.className = 'date';
     date.textContent = formatDate(task.date_str);
 
+    const time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = `${formatTime(task)}-${endTimeStr(task)}`;
+
     const created = document.createElement('span');
     created.className = 'meta';
     created.textContent = `作成:${formatDateTime(task.created_at)}`;
@@ -398,7 +391,7 @@ function renderList(container, tasks, paneName, isPending) {
       updated.textContent = `更新:${formatDateTime(task.updated_at)}`;
     }
 
-    row.append(cursor, time, title, tag, date, created, updated);
+    row.append(cursor, title, tag, date, time, created, updated);
     row.addEventListener('click', () => {
       state.activePane = paneName;
       state.selectedIndex = idx;
