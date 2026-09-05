@@ -307,7 +307,7 @@ function taskMatches(task, query) {
 }
 
 function compareTasks(a, b) {
-  return new Date(a.created_at) - new Date(b.created_at);
+  return new Date(b.created_at) - new Date(a.created_at);
 }
 
 function splitTasks() {
