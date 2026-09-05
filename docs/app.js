@@ -306,6 +306,17 @@ function taskMatches(task, query) {
     || (task.memo && task.memo.toLowerCase().includes(q));
 }
 
+function compareTasks(a, b) {
+  return (
+    a.title.localeCompare(b.title, 'ja')
+    || (a.tag || '').localeCompare(b.tag || '', 'ja')
+    || a.date_str.localeCompare(b.date_str)
+    || a.time_str.localeCompare(b.time_str)
+    || new Date(a.created_at) - new Date(b.created_at)
+    || new Date(a.updated_at) - new Date(b.updated_at)
+  );
+}
+
 function splitTasks() {
   const pending = [];
   const archived = [];
@@ -314,8 +325,8 @@ function splitTasks() {
     if (t.archived) archived.push(t);
     else pending.push(t);
   }
-  pending.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  archived.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  pending.sort(compareTasks);
+  archived.sort(compareTasks);
   return { pending, archived };
 }
 
