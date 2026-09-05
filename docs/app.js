@@ -658,28 +658,25 @@ function tryExpandSnippet(el) {
   for (const trig of triggers) {
     if (!trig || !before.endsWith(trig)) continue;
     const startIdx = caret - trig.length;
-    const charBefore = startIdx > 0 ? before[startIdx - 1] : '';
-    if (startIdx === 0 || /\s/.test(charBefore)) {
-      const expansion = Object.prototype.hasOwnProperty.call(snippets, trig)
-        ? snippets[trig]
-        : BUILTIN_SNIPPETS[trig]();
+    const expansion = Object.prototype.hasOwnProperty.call(snippets, trig)
+      ? snippets[trig]
+      : BUILTIN_SNIPPETS[trig]();
 
-      // | をカーソル位置マーカーとして処理
-      const cursorIdx = expansion.indexOf('|');
-      let newText, newCaret;
-      if (cursorIdx !== -1) {
-        const clean = expansion.slice(0, cursorIdx) + expansion.slice(cursorIdx + 1);
-        newText = value.slice(0, startIdx) + clean + value.slice(caret);
-        newCaret = startIdx + cursorIdx;
-      } else {
-        newText = value.slice(0, startIdx) + expansion + value.slice(caret);
-        newCaret = startIdx + expansion.length;
-      }
-
-      el.value = newText;
-      el.setSelectionRange(newCaret, newCaret);
-      return true;
+    // | をカーソル位置マーカーとして処理
+    const cursorIdx = expansion.indexOf('|');
+    let newText, newCaret;
+    if (cursorIdx !== -1) {
+      const clean = expansion.slice(0, cursorIdx) + expansion.slice(cursorIdx + 1);
+      newText = value.slice(0, startIdx) + clean + value.slice(caret);
+      newCaret = startIdx + cursorIdx;
+    } else {
+      newText = value.slice(0, startIdx) + expansion + value.slice(caret);
+      newCaret = startIdx + expansion.length;
     }
+
+    el.value = newText;
+    el.setSelectionRange(newCaret, newCaret);
+    return true;
   }
   return false;
 }
