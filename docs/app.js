@@ -636,20 +636,47 @@ function renderSnippetsList() {
   });
 }
 
+// 組み込み動的スニペット（ユーザー定義で上書き可）
+const BUILTIN_SNIPPETS = {
+  ';today': () => todayDateStr(),
+  ';now': () => nowTimeStr(),
+};
+
 function tryExpandSnippet(el) {
   if (el.selectionStart !== el.selectionEnd) return false;
   const value = el.value;
   const caret = el.selectionStart;
   const before = value.slice(0, caret);
-  const triggers = Object.keys(snippets).sort((a, b) => b.length - a.length);
+
+  // ユーザー定義を優先し、組み込みをフォールバックとして結合
+  const seen = new Set();
+  const triggers = [
+    ...Object.keys(snippets).sort((a, b) => b.length - a.length),
+    ...Object.keys(BUILTIN_SNIPPETS),
+  ].filter((t) => { if (seen.has(t)) return false; seen.add(t); return true; });
+
   for (const trig of triggers) {
     if (!trig || !before.endsWith(trig)) continue;
     const startIdx = caret - trig.length;
     const charBefore = startIdx > 0 ? before[startIdx - 1] : '';
     if (startIdx === 0 || /\s/.test(charBefore)) {
-      const expansion = snippets[trig];
-      el.value = value.slice(0, startIdx) + expansion + value.slice(caret);
-      const newCaret = startIdx + expansion.length;
+      const expansion = Object.prototype.hasOwnProperty.call(snippets, trig)
+        ? snippets[trig]
+        : BUILTIN_SNIPPETS[trig]();
+
+      // | をカーソル位置マーカーとして処理
+      const cursorIdx = expansion.indexOf('|');
+      let newText, newCaret;
+      if (cursorIdx !== -1) {
+        const clean = expansion.slice(0, cursorIdx) + expansion.slice(cursorIdx + 1);
+        newText = value.slice(0, startIdx) + clean + value.slice(caret);
+        newCaret = startIdx + cursorIdx;
+      } else {
+        newText = value.slice(0, startIdx) + expansion + value.slice(caret);
+        newCaret = startIdx + expansion.length;
+      }
+
+      el.value = newText;
       el.setSelectionRange(newCaret, newCaret);
       return true;
     }
