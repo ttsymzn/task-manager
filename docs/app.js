@@ -639,7 +639,7 @@ function renderSnippetsList() {
 // 組み込み動的スニペット（ユーザー定義で上書き可）
 const BUILTIN_SNIPPETS = {
   ';today': () => todayDateStr(),
-  ';now': () => nowTimeStr(),
+  ';now': () => { const n = new Date(); return `${pad2(n.getHours())}:${pad2(n.getMinutes())}`; },
 };
 
 function tryExpandSnippet(el) {
