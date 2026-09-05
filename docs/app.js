@@ -1033,7 +1033,7 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
     const task = currentSelectedTask();
-    if (task) deleteTask(task);
+    if (task && confirm(`削除しますか?\n"${task.title}"`)) deleteTask(task);
   } else if (e.key === 'a' || e.key === 'A') {
     e.preventDefault();
     const task = currentSelectedTask();
