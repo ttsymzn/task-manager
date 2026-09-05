@@ -1,17 +1,21 @@
 # task-manager
 
 ターミナル風の見た目のタスク管理Webアプリ。GitHub Pages(静的ホスティング)+ Supabase(データベース・認証)構成。
-メール/パスワードでログインすれば、どの端末からでも同じタスクにアクセスできます。
+メール/パスワードでログインすれば、どの端末からでも同じタスク・スニペットにアクセスできます。
 
 ## 1. Supabaseプロジェクトを作成する
 
 1. https://supabase.com で新規プロジェクトを作成
 2. 左メニュー「SQL Editor」を開き、[`supabase/schema.sql`](supabase/schema.sql) の内容をすべて貼り付けて実行
-   - `tasks` テーブル、Row Level Security(自分の行しか読み書きできない設定)、複数端末同期用のRealtime設定が作成されます
+   - `tasks` テーブル・`snippets` テーブル、Row Level Security、Realtimeの設定が作成されます
 3. 左メニュー「Authentication」→「Providers」で Email が有効になっていることを確認
    - 個人利用でメール確認を省略したい場合は「Authentication」→「Providers」→「Email」→「Confirm email」をオフにすると、サインアップ後すぐログインできます
-4. 左メニュー「Project Settings」→「API」から以下をコピー
-   - `Project URL`
+4. 左メニュー「Authentication」→「URL Configuration」で以下を設定
+   - **Site URL**: `https://<ユーザー名>.github.io/<リポジトリ名>/`
+   - **Redirect URLs**: 同じURLを追加
+   - ※ これを設定しないと確認メールのリンクが正しく機能しません
+5. 左メニュー「Project Settings」→「API」から以下をコピー
+   - `Project URL`（例: `https://xxxxxxxx.supabase.co`）
    - `anon public` キー
 
 ## 2. アプリに認証情報を設定する
@@ -22,6 +26,8 @@
 window.SUPABASE_URL = 'https://xxxxxxxx.supabase.co';
 window.SUPABASE_ANON_KEY = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 ```
+
+**注意**: `SUPABASE_URL` はパスなしのベースURLのみを設定してください（`/rest/v1/` などを末尾に付けないでください）。
 
 `anon public` キーは公開されて問題ないキーです(実際のアクセス制御はRLSポリシーで行われます)。
 
@@ -37,7 +43,7 @@ npx serve docs
 
 1. GitHubで新しいリポジトリを作成(公開リポジトリ。無料プランではPagesの公開範囲を非公開にはできません)
 2. このフォルダをそのリポジトリにpush
-3. リポジトリの Settings → Pages で、Source を「Deploy from a branch」、Branch を `main` / `docs` フォルダに設定
+3. リポジトリの Settings → Pages で、Source を「Deploy from a branch」、Branch を `master`(または`main`) / `docs` フォルダに設定
 4. 数分後、`https://<ユーザー名>.github.io/<リポジトリ名>/` でアクセス可能になります
 
 ## 5. 既存タスクの移行
@@ -54,7 +60,17 @@ Supabase設定後、アプリ画面右上の `csv import` ボタンからこの�
 
 ホーム画面から起動するとアドレスバーのないアプリ画面(standalone表示)になり、静的ファイルはオフラインでもキャッシュから表示されます(タスクデータの読み書きにはネット接続とSupabaseへのアクセスが必要です)。
 
+スマホ向けUIとして、画面下部に操作ボタンが表示されます:
+
+| ボタン | 動作 |
+|--------|------|
+| ▲ / ▼ | タスク間のカーソル移動 |
+| edit / 保存 | タスクの編集開始・保存 |
+| arch | アーカイブ切り替え |
+| del | 削除（確認あり） |
+| / / Esc | 検索を開く・編集や検索をキャンセル |
+
 ## 注意事項
 
 - GitHub Pagesの公開URLは誰でもアクセスできますが、ログインしなければタスクは見えません。ただし新規登録(サインアップ)自体は誰でも行える状態です。第三者に使われたくない場合は、Supabaseの「Authentication」→「Providers」→「Email」でサインアップを無効化する、あるいは招待制にするなどの追加設定を検討してください。
-- テキストスパンディングのスニペット設定は端末のブラウザ(localStorage)に保存されるため、端末ごとに個別設定になります。タスクデータのみSupabaseで同期されます。
+- タスクデータ・テキストスパンディングのスニペット設定はどちらもSupabaseに保存され、全端末で同期されます。
