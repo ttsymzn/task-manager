@@ -5,6 +5,16 @@ function isMobile() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
+function renderMarkdown(text) {
+  if (!text) return '';
+  const html = window.marked
+    ? window.marked.parse(text, { breaks: true })
+    : text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+  return html
+    .replace(/\[x\]/gi, '☑')
+    .replace(/\[ \]/g, '□');
+}
+
 const state = {
   tasks: [],
   editingId: null,
@@ -409,9 +419,7 @@ function renderList(container, tasks, paneName, isPending) {
     if (state.activePane === paneName && state.selectedIndex === idx && task.memo) {
       const peek = document.createElement('div');
       peek.className = 'memo-peek';
-      peek.innerHTML = window.marked
-        ? window.marked.parse(task.memo)
-        : task.memo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+      peek.innerHTML = renderMarkdown(task.memo);
       container.appendChild(peek);
     }
   });
@@ -718,7 +726,7 @@ let memoPreviewMode = false;
 function setMemoPreviewMode(on) {
   memoPreviewMode = on;
   if (on) {
-    const html = window.marked ? window.marked.parse(els.memoInput.value || '') : els.memoInput.value;
+    const html = renderMarkdown(els.memoInput.value);
     els.memoPreview.innerHTML = html;
     els.memoEditArea.classList.add('hidden');
     els.memoPreview.classList.remove('hidden');
