@@ -11,12 +11,12 @@ if (window.marked) {
 
 function renderMarkdown(text) {
   if (!text) return '';
-  const html = window.marked
-    ? window.marked.parse(text)
-    : text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
-  return html
+  const preprocessed = text
     .replace(/\[x\]/gi, '☑')
-    .replace(/\[ \]/g, '□');
+    .replace(/\[\s\]/g, '□');
+  return window.marked
+    ? window.marked.parse(preprocessed)
+    : preprocessed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
 }
 
 const state = {
