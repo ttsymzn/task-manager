@@ -405,6 +405,15 @@ function renderList(container, tasks, paneName, isPending) {
       render();
     });
     container.appendChild(row);
+
+    if (state.activePane === paneName && state.selectedIndex === idx && task.memo) {
+      const peek = document.createElement('div');
+      peek.className = 'memo-peek';
+      peek.innerHTML = window.marked
+        ? window.marked.parse(task.memo)
+        : task.memo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+      container.appendChild(peek);
+    }
   });
 }
 
