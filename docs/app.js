@@ -5,10 +5,14 @@ function isMobile() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
+if (window.marked) {
+  window.marked.use({ breaks: true, gfm: true });
+}
+
 function renderMarkdown(text) {
   if (!text) return '';
   const html = window.marked
-    ? window.marked.parse(text, { breaks: true })
+    ? window.marked.parse(text)
     : text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
   return html
     .replace(/\[x\]/gi, '☑')
