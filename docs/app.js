@@ -13,7 +13,7 @@ function renderMarkdown(text) {
   if (!text) return '';
   const preprocessed = text
     .replace(/\[x\]/gi, '☑')
-    .replace(/\[\s\]/g, '□');
+    .replace(/\[\s?\]/g, '□');
   return window.marked
     ? window.marked.parse(preprocessed)
     : preprocessed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
