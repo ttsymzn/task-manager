@@ -38,6 +38,9 @@ const els = {
   memoSection: document.getElementById('memo-section'),
   memoInput: document.getElementById('memo-input'),
   memoBackdrop: document.getElementById('memo-backdrop'),
+  memoEditArea: document.getElementById('memo-edit-area'),
+  memoPreview: document.getElementById('memo-preview'),
+  memoPreviewBtn: document.getElementById('memo-preview-btn'),
   inputBackdrop: document.getElementById('input-backdrop'),
   searchline: document.getElementById('searchline'),
   searchInput: document.getElementById('search-input'),
@@ -701,6 +704,23 @@ function renderMemoBackdrop() {
 // 編集モード
 // =========================================================
 
+let memoPreviewMode = false;
+
+function setMemoPreviewMode(on) {
+  memoPreviewMode = on;
+  if (on) {
+    const html = window.marked ? window.marked.parse(els.memoInput.value || '') : els.memoInput.value;
+    els.memoPreview.innerHTML = html;
+    els.memoEditArea.classList.add('hidden');
+    els.memoPreview.classList.remove('hidden');
+    els.memoPreviewBtn.textContent = 'edit';
+  } else {
+    els.memoEditArea.classList.remove('hidden');
+    els.memoPreview.classList.add('hidden');
+    els.memoPreviewBtn.textContent = 'preview';
+  }
+}
+
 function enterEditMode(task) {
   state.editingId = task.id;
   els.input.value = buildCommandString(task);
@@ -708,6 +728,7 @@ function enterEditMode(task) {
   els.editFlag.classList.remove('hidden');
   els.memoSection.classList.remove('hidden');
   els.memoInput.value = task.memo || '';
+  setMemoPreviewMode(false);
   setMessage('');
   renderInputBackdrop();
   renderMemoBackdrop();
@@ -736,6 +757,7 @@ function enterEditMode(task) {
 
 function exitEditMode() {
   state.editingId = null;
+  setMemoPreviewMode(false);
   els.input.value = '';
   els.prompt.textContent = '$';
   els.editFlag.classList.add('hidden');
@@ -880,6 +902,11 @@ els.input.addEventListener('scroll', () => {
 els.memoInput.addEventListener('input', () => {
   tryExpandSnippet(els.memoInput);
   renderMemoBackdrop();
+});
+
+els.memoPreviewBtn.addEventListener('click', () => {
+  setMemoPreviewMode(!memoPreviewMode);
+  if (!memoPreviewMode) els.memoInput.focus();
 });
 els.memoInput.addEventListener('scroll', () => {
   els.memoBackdrop.scrollTop = els.memoInput.scrollTop;

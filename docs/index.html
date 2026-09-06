@@ -60,11 +60,15 @@ keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  
           </div>
         </div>
         <div class="memo-section hidden" id="memo-section">
-          <div class="memo-label"># memo</div>
-          <div class="memo-wrap">
+          <div class="memo-label">
+            # memo
+            <button type="button" id="memo-preview-btn" class="tool-btn small">preview</button>
+          </div>
+          <div class="memo-wrap" id="memo-edit-area">
             <div class="memo-backdrop" id="memo-backdrop"></div>
             <textarea id="memo-input" rows="10" spellcheck="false" placeholder="メモを入力... (Ctrl+Enter で保存)"></textarea>
           </div>
+          <div class="memo-preview hidden" id="memo-preview"></div>
         </div>
         <div class="searchline hidden" id="searchline">
           <span class="prompt">/</span>
@@ -125,6 +129,7 @@ keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
