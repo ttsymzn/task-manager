@@ -9,14 +9,20 @@ if (window.marked) {
   window.marked.use({ breaks: true, gfm: true });
 }
 
-function renderMarkdown(text) {
+function renderMarkdown(text, query) {
   if (!text) return '';
   const preprocessed = text
     .replace(/\[x\]/gi, '☑')
     .replace(/\[\s?\]/g, '□');
-  return window.marked
+  let html = window.marked
     ? window.marked.parse(preprocessed)
     : preprocessed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+  if (query) {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(${escaped})`, 'gi');
+    html = html.replace(/>([^<]*)</g, (_, t) => '>' + t.replace(re, '<mark class="hit">$1</mark>') + '<');
+  }
+  return html;
 }
 
 const state = {
@@ -423,7 +429,7 @@ function renderList(container, tasks, paneName, isPending) {
     if (state.activePane === paneName && state.selectedIndex === idx && task.memo) {
       const peek = document.createElement('div');
       peek.className = 'memo-peek';
-      peek.innerHTML = renderMarkdown(task.memo);
+      peek.innerHTML = renderMarkdown(task.memo, state.searchQuery);
       container.appendChild(peek);
     }
   });
@@ -730,7 +736,7 @@ let memoPreviewMode = false;
 function setMemoPreviewMode(on) {
   memoPreviewMode = on;
   if (on) {
-    const html = renderMarkdown(els.memoInput.value);
+    const html = renderMarkdown(els.memoInput.value, state.searchQuery);
     els.memoPreview.innerHTML = html;
     els.memoEditArea.classList.add('hidden');
     els.memoPreview.classList.remove('hidden');
