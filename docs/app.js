@@ -925,6 +925,394 @@ async function importCsvFile(file) {
 }
 
 // =========================================================
+// Google Tasks 連携
+// =========================================================
+
+const GTASKS_API = 'https://tasks.googleapis.com/tasks/v1';
+const G_META_START = '[task-manager]';
+const G_META_END = '[/task-manager]';
+const LS_G_TOKEN = 'gtasks_token';
+const LS_G_EXPIRY = 'gtasks_expiry';
+const LS_G_LIST_ID = 'gtasks_list_id';
+const LS_G_INTERVAL = 'gtasks_interval';
+const LS_G_LAST_SYNC = 'gtasks_last_sync';
+
+let gTokenClient = null;
+let gAccessToken = null;
+let gTokenExpiry = 0;
+let gSyncTimer = null;
+let gSyncing = false;
+
+const gels = {
+  btn: document.getElementById('gtasks-btn'),
+  panel: document.getElementById('gtasks-panel'),
+  statusBadge: document.getElementById('gtasks-status-badge'),
+  connectBtn: document.getElementById('gtasks-connect-btn'),
+  settings: document.getElementById('gtasks-settings'),
+  listSelect: document.getElementById('gtasks-list-select'),
+  intervalSelect: document.getElementById('gtasks-interval-select'),
+  syncNowBtn: document.getElementById('gtasks-sync-now-btn'),
+  disconnectBtn: document.getElementById('gtasks-disconnect-btn'),
+  lastSync: document.getElementById('gtasks-last-sync'),
+  closeBtn: document.getElementById('gtasks-close-btn'),
+};
+
+function gIsConnected() {
+  return !!(gAccessToken && Date.now() < gTokenExpiry);
+}
+
+function gLoadFromStorage() {
+  gAccessToken = localStorage.getItem(LS_G_TOKEN) || null;
+  const exp = localStorage.getItem(LS_G_EXPIRY);
+  gTokenExpiry = exp ? parseInt(exp, 10) : 0;
+  if (gAccessToken && Date.now() >= gTokenExpiry) {
+    gAccessToken = null;
+    localStorage.removeItem(LS_G_TOKEN);
+    localStorage.removeItem(LS_G_EXPIRY);
+  }
+}
+
+function gSaveToken(token, expiresIn) {
+  gAccessToken = token;
+  gTokenExpiry = Date.now() + (parseInt(expiresIn, 10) - 60) * 1000;
+  localStorage.setItem(LS_G_TOKEN, token);
+  localStorage.setItem(LS_G_EXPIRY, String(gTokenExpiry));
+}
+
+function gClearToken() {
+  gAccessToken = null;
+  gTokenExpiry = 0;
+  localStorage.removeItem(LS_G_TOKEN);
+  localStorage.removeItem(LS_G_EXPIRY);
+}
+
+function gStopSyncTimer() {
+  if (gSyncTimer) { clearInterval(gSyncTimer); gSyncTimer = null; }
+}
+
+function gStartSyncTimer() {
+  gStopSyncTimer();
+  const minutes = parseInt(localStorage.getItem(LS_G_INTERVAL) || '10', 10);
+  if (minutes > 0 && gIsConnected() && localStorage.getItem(LS_G_LIST_ID)) {
+    gSyncTimer = setInterval(syncWithGoogleTasks, minutes * 60 * 1000);
+  }
+}
+
+async function gFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${gAccessToken}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  if (res.status === 401) {
+    gClearToken();
+    gUpdateUI();
+    throw new Error('Googleトークンが期限切れです。再接続してください。');
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Google API ${res.status}: ${body}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function gGetTaskLists() {
+  const data = await gFetch(`${GTASKS_API}/users/@me/lists?maxResults=100`);
+  return (data && data.items) || [];
+}
+
+async function gGetAllTasks(listId) {
+  let items = [];
+  let pageToken;
+  do {
+    const params = new URLSearchParams({ maxResults: '100', showCompleted: 'true', showHidden: 'true' });
+    if (pageToken) params.set('pageToken', pageToken);
+    const data = await gFetch(`${GTASKS_API}/lists/${encodeURIComponent(listId)}/tasks?${params}`);
+    if (data && data.items) items = items.concat(data.items);
+    pageToken = data && data.nextPageToken;
+  } while (pageToken);
+  return items;
+}
+
+async function gCreateTask(listId, body) {
+  return gFetch(`${GTASKS_API}/lists/${encodeURIComponent(listId)}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+async function gPatchTask(listId, taskId, body) {
+  return gFetch(`${GTASKS_API}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+async function gDeleteGTask(listId, taskId) {
+  await gFetch(`${GTASKS_API}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+  });
+}
+
+function buildNotes(task) {
+  const meta = [G_META_START, `tag:${task.tag || ''}`, `time:${task.time_str || ''}`, `duration:${task.duration}`, G_META_END].join('\n');
+  return task.memo ? `${meta}\n${task.memo}` : meta;
+}
+
+function parseNotes(notes) {
+  if (!notes) return { tag: null, time_str: null, duration: 0, memo: '' };
+  const m = /\[task-manager\]([\s\S]*?)\[\/task-manager\]/.exec(notes);
+  if (!m) return { tag: null, time_str: null, duration: 0, memo: notes };
+  const block = m[1];
+  const memo = notes.slice(m.index + m[0].length).replace(/^\n/, '');
+  const get = (key) => { const r = new RegExp(`^${key}:(.*)`, 'm'); const x = r.exec(block); return x ? x[1].trim() : ''; };
+  return {
+    tag: get('tag') || null,
+    time_str: get('time') || nowTimeStr(),
+    duration: parseFloat(get('duration')) || 0,
+    memo,
+  };
+}
+
+function sbToGtask(task) {
+  const body = {
+    title: task.title,
+    notes: buildNotes(task),
+    due: `${formatDate(task.date_str)}T00:00:00.000Z`,
+    status: task.archived ? 'completed' : 'needsAction',
+  };
+  if (task.archived) body.completed = new Date().toISOString();
+  return body;
+}
+
+function gtaskToSb(gt) {
+  const dateStr = gt.due ? gt.due.slice(0, 10).replace(/-/g, '') : todayDateStr();
+  const { tag, time_str, duration, memo } = parseNotes(gt.notes);
+  return {
+    title: gt.title || '(無題)',
+    tag,
+    date_str: dateStr,
+    time_str: time_str || nowTimeStr(),
+    duration,
+    memo,
+    archived: gt.status === 'completed',
+    google_task_id: gt.id,
+  };
+}
+
+async function gPushTaskCreate(sbTask) {
+  if (!gIsConnected()) return;
+  const listId = localStorage.getItem(LS_G_LIST_ID);
+  if (!listId) return;
+  try {
+    const gt = await gCreateTask(listId, sbToGtask(sbTask));
+    if (gt && gt.id) await sbClient.from('tasks').update({ google_task_id: gt.id }).eq('id', sbTask.id);
+  } catch (e) {
+    console.warn('Google Tasks create failed:', e.message);
+  }
+}
+
+async function gPushTaskUpdate(sbTask) {
+  if (!gIsConnected()) return;
+  const listId = localStorage.getItem(LS_G_LIST_ID);
+  if (!listId) return;
+  try {
+    if (sbTask.google_task_id) {
+      await gPatchTask(listId, sbTask.google_task_id, sbToGtask(sbTask));
+    } else {
+      const gt = await gCreateTask(listId, sbToGtask(sbTask));
+      if (gt && gt.id) await sbClient.from('tasks').update({ google_task_id: gt.id }).eq('id', sbTask.id);
+    }
+  } catch (e) {
+    console.warn('Google Tasks update failed:', e.message);
+  }
+}
+
+async function gPushArchiveToggle(sbTask) {
+  if (!gIsConnected() || !sbTask.google_task_id) return;
+  const listId = localStorage.getItem(LS_G_LIST_ID);
+  if (!listId) return;
+  try {
+    const body = { status: sbTask.archived ? 'completed' : 'needsAction' };
+    if (sbTask.archived) body.completed = new Date().toISOString();
+    await gPatchTask(listId, sbTask.google_task_id, body);
+  } catch (e) {
+    console.warn('Google Tasks archive sync failed:', e.message);
+  }
+}
+
+async function syncWithGoogleTasks() {
+  const listId = localStorage.getItem(LS_G_LIST_ID);
+  if (!listId) { setMessage('Google Tasks: 同期リストが未選択です', 'error'); return; }
+  if (!gIsConnected()) { setMessage('Google Tasks: 未接続です', 'error'); return; }
+  if (gSyncing) return;
+  gSyncing = true;
+  if (gels.syncNowBtn) gels.syncNowBtn.disabled = true;
+  setMessage('Google Tasks と同期中...', '');
+
+  try {
+    const [gTasks, { data: sbTasks, error: sbErr }] = await Promise.all([
+      gGetAllTasks(listId),
+      sbClient.from('tasks').select('*'),
+    ]);
+    if (sbErr) throw sbErr;
+
+    const gMap = new Map(gTasks.filter((t) => !t.deleted).map((t) => [t.id, t]));
+    const sbWithG = sbTasks.filter((t) => t.google_task_id);
+    const sbNoG = sbTasks.filter((t) => !t.google_task_id);
+    const ops = [];
+
+    // 既存の紐付きタスクを照合
+    for (const sbTask of sbWithG) {
+      const gTask = gMap.get(sbTask.google_task_id);
+      if (!gTask) {
+        // Google側で削除済み → Supabaseからも削除
+        ops.push(sbClient.from('tasks').delete().eq('id', sbTask.id));
+        continue;
+      }
+      const sbTime = new Date(sbTask.updated_at).getTime();
+      const gTime = gTask.updated ? new Date(gTask.updated).getTime() : 0;
+      if (sbTime >= gTime) {
+        await gPatchTask(listId, gTask.id, sbToGtask(sbTask));
+      } else {
+        const conv = gtaskToSb(gTask);
+        ops.push(sbClient.from('tasks').update({
+          title: conv.title, tag: conv.tag, date_str: conv.date_str,
+          time_str: conv.time_str, duration: conv.duration, memo: conv.memo,
+          archived: conv.archived,
+        }).eq('id', sbTask.id));
+      }
+      gMap.delete(sbTask.google_task_id);
+    }
+
+    // google_task_id未設定のタスクをGoogle Tasksへ送信
+    for (const sbTask of sbNoG) {
+      const gt = await gCreateTask(listId, sbToGtask(sbTask));
+      if (gt && gt.id) ops.push(sbClient.from('tasks').update({ google_task_id: gt.id }).eq('id', sbTask.id));
+    }
+
+    // Google Tasks側にのみ存在するタスクをインポート
+    const toInsert = [];
+    for (const [, gTask] of gMap) {
+      if (!gTask.title) continue;
+      toInsert.push(gtaskToSb(gTask));
+    }
+    if (toInsert.length > 0) ops.push(sbClient.from('tasks').insert(toInsert));
+
+    await Promise.all(ops);
+
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+    localStorage.setItem(LS_G_LAST_SYNC, stamp);
+    await fetchTasks();
+    gUpdateUI();
+    setMessage(`Google Tasks 同期完了 (${pad2(now.getHours())}:${pad2(now.getMinutes())})`, 'ok');
+  } catch (err) {
+    setMessage(`Google Tasks エラー: ${err.message}`, 'error');
+  } finally {
+    gSyncing = false;
+    if (gels.syncNowBtn) gels.syncNowBtn.disabled = false;
+  }
+}
+
+async function gLoadListsAndUpdateUI() {
+  try {
+    const lists = await gGetTaskLists();
+    gels.listSelect.innerHTML = '';
+    const savedId = localStorage.getItem(LS_G_LIST_ID);
+    for (const list of lists) {
+      const opt = document.createElement('option');
+      opt.value = list.id;
+      opt.textContent = list.title;
+      if (list.id === savedId) opt.selected = true;
+      gels.listSelect.appendChild(opt);
+    }
+    if (!savedId && lists.length > 0) {
+      localStorage.setItem(LS_G_LIST_ID, lists[0].id);
+      gels.listSelect.value = lists[0].id;
+    }
+    gUpdateUI();
+  } catch (err) {
+    setMessage(`リスト取得エラー: ${err.message}`, 'error');
+  }
+}
+
+function gUpdateUI() {
+  if (!gels.btn) return;
+  const connected = gIsConnected();
+  gels.btn.textContent = connected ? 'google sync ✓' : 'google sync';
+  gels.statusBadge.textContent = connected ? '接続済み' : '未接続';
+  gels.statusBadge.className = 'gtasks-badge' + (connected ? ' connected' : '');
+  gels.connectBtn.textContent = connected ? '再接続' : 'Googleで接続';
+  gels.settings.classList.toggle('hidden', !connected);
+  const savedInterval = localStorage.getItem(LS_G_INTERVAL) || '10';
+  if (gels.intervalSelect) gels.intervalSelect.value = savedInterval;
+  const lastSync = localStorage.getItem(LS_G_LAST_SYNC);
+  gels.lastSync.textContent = lastSync ? `最終同期: ${lastSync}` : '';
+}
+
+async function gConnect() {
+  if (!window.GOOGLE_CLIENT_ID) {
+    setMessage('error: config.js に GOOGLE_CLIENT_ID が設定されていません。README を参照してください。', 'error');
+    return;
+  }
+  if (!window.google || !window.google.accounts) {
+    setMessage('error: Google Identity Services が読み込めませんでした', 'error');
+    return;
+  }
+  gTokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: window.GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/tasks',
+    callback: async (resp) => {
+      if (resp.error) { setMessage(`Google 認証エラー: ${resp.error}`, 'error'); return; }
+      gSaveToken(resp.access_token, resp.expires_in);
+      await gLoadListsAndUpdateUI();
+      gStartSyncTimer();
+      await syncWithGoogleTasks();
+    },
+  });
+  gTokenClient.requestAccessToken({ prompt: gIsConnected() ? '' : undefined });
+}
+
+gels.btn.addEventListener('click', () => {
+  const opening = gels.panel.classList.contains('hidden');
+  gels.panel.classList.toggle('hidden');
+  if (opening) {
+    if (gIsConnected() && gels.listSelect.options.length === 0) gLoadListsAndUpdateUI();
+    else gUpdateUI();
+  }
+});
+
+gels.connectBtn.addEventListener('click', gConnect);
+
+gels.disconnectBtn.addEventListener('click', () => {
+  gClearToken();
+  gStopSyncTimer();
+  gUpdateUI();
+  setMessage('Google Tasks との接続を切断しました', 'ok');
+});
+
+gels.listSelect.addEventListener('change', () => {
+  localStorage.setItem(LS_G_LIST_ID, gels.listSelect.value);
+  gStartSyncTimer();
+});
+
+gels.intervalSelect.addEventListener('change', () => {
+  localStorage.setItem(LS_G_INTERVAL, gels.intervalSelect.value);
+  gStartSyncTimer();
+});
+
+gels.syncNowBtn.addEventListener('click', syncWithGoogleTasks);
+
+gels.closeBtn.addEventListener('click', () => { gels.panel.classList.add('hidden'); });
+
+gLoadFromStorage();
+
+// =========================================================
 // イベント配線
 // =========================================================
 
