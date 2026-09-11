@@ -171,6 +171,8 @@ function showApp(session) {
   subscribeRealtime(session.user.id);
   fetchTasks();
   fetchSnippets();
+  gUpdateUI();
+  gStartSyncTimer();
   els.input.focus();
 }
 
@@ -182,6 +184,7 @@ function showAuth() {
     realtimeChannel = null;
   }
   state.tasks = [];
+  gStopSyncTimer();
 }
 
 sbClient.auth.onAuthStateChange((_event, session) => {
@@ -520,6 +523,7 @@ async function submitCommand() {
         .single();
       if (error) throw error;
       setMessage(`updated: ${data.title}`, 'ok');
+      await gPushTaskUpdate(data);
     } else {
       const { data, error } = await sbClient
         .from('tasks')
@@ -536,6 +540,7 @@ async function submitCommand() {
         .single();
       if (error) throw error;
       setMessage(`created: ${data.title}`, 'ok');
+      await gPushTaskCreate(data);
     }
     exitEditMode();
     await fetchTasks();
@@ -555,11 +560,16 @@ async function toggleArchive(task) {
     setMessage(`error: ${error.message}`, 'error');
     return;
   }
+  await gPushArchiveToggle(data);
   setMessage(data.archived ? `archived: ${data.title}` : `unarchived: ${data.title}`, 'ok');
   await fetchTasks();
 }
 
 async function deleteTask(task) {
+  if (gIsConnected() && task.google_task_id) {
+    const listId = localStorage.getItem(LS_G_LIST_ID);
+    if (listId) await gDeleteGTask(listId, task.google_task_id).catch(() => {});
+  }
   const { error } = await sbClient.from('tasks').delete().eq('id', task.id);
   if (error) {
     setMessage(`error: ${error.message}`, 'error');

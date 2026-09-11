@@ -89,3 +89,9 @@ create policy "update own snippets" on public.snippets
 drop policy if exists "delete own snippets" on public.snippets;
 create policy "delete own snippets" on public.snippets
   for delete using (auth.uid() = user_id);
+
+-- =========================================================
+-- Google Tasks 連携: google_task_id カラム追加
+-- 既存の tasks テーブルに対して実行してください
+-- =========================================================
+alter table public.tasks add column if not exists google_task_id text;

@@ -674,6 +674,87 @@ mark.hit {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
 
 /* =========================================================
+   Google Tasks パネル
+   ========================================================= */
+.gtasks-panel {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #050603;
+}
+
+.gtasks-header {
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gtasks-badge {
+  font-weight: normal;
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.gtasks-badge.connected {
+  color: var(--accent);
+}
+
+.gtasks-connect-row {
+  margin-bottom: 8px;
+}
+
+.gtasks-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+
+.gtasks-row label {
+  color: var(--fg-dim);
+  flex: 0 0 64px;
+}
+
+.gtasks-select {
+  background: #0a0d09;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 3px 6px;
+  outline: none;
+  cursor: pointer;
+  flex: 1;
+}
+
+.gtasks-action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.gtasks-last-sync {
+  color: var(--fg-dim);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.gtasks-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+/* =========================================================
    Mobile UI (touch devices only)
    ========================================================= */
 .mobile-pane-tabs,

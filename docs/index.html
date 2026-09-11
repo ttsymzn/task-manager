@@ -81,6 +81,40 @@ keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  
           <button type="button" id="csv-import-btn" class="tool-btn">csv import</button>
           <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden">
           <button type="button" id="snippets-btn" class="tool-btn">snippets</button>
+          <button type="button" id="gtasks-btn" class="tool-btn">google sync</button>
+        </div>
+        <div class="gtasks-panel hidden" id="gtasks-panel">
+          <div class="gtasks-header">
+            # google_tasks <span id="gtasks-status-badge" class="gtasks-badge">未接続</span>
+          </div>
+          <div class="gtasks-connect-row">
+            <button type="button" id="gtasks-connect-btn" class="tool-btn">Googleで接続</button>
+          </div>
+          <div id="gtasks-settings" class="hidden">
+            <div class="gtasks-row">
+              <label>同期リスト</label>
+              <select id="gtasks-list-select" class="gtasks-select"></select>
+            </div>
+            <div class="gtasks-row">
+              <label>自動同期</label>
+              <select id="gtasks-interval-select" class="gtasks-select">
+                <option value="0">手動のみ</option>
+                <option value="5">5分ごと</option>
+                <option value="10" selected>10分ごと</option>
+                <option value="15">15分ごと</option>
+                <option value="30">30分ごと</option>
+                <option value="60">60分ごと</option>
+              </select>
+            </div>
+            <div class="gtasks-action-row">
+              <button type="button" id="gtasks-sync-now-btn" class="tool-btn">今すぐ同期</button>
+              <button type="button" id="gtasks-disconnect-btn" class="tool-btn">切断</button>
+            </div>
+            <div id="gtasks-last-sync" class="gtasks-last-sync"></div>
+          </div>
+          <div class="gtasks-footer">
+            <button type="button" id="gtasks-close-btn" class="tool-btn small">閉じる</button>
+          </div>
         </div>
         <div class="snippets-panel hidden" id="snippets-panel">
           <div class="snippets-help">空白の直後にトリガー文字列を入力すると展開文字列に置き換わります(複数行可)。展開文字列中の <code>|</code> がカーソル位置になります。組み込み: <code>;today</code> → 今日の日付(yyyymmdd)、<code>;now</code> → 現在時刻(hh:mm)</div>
@@ -129,6 +163,7 @@ keys: ↑↓ 選択移動  ←→ ペイン切替  Enter 編集  Delete 削除  
     </div>
   </div>
 
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
