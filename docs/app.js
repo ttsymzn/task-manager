@@ -334,7 +334,7 @@ function taskMatches(task, query) {
 }
 
 function compareTasks(a, b) {
-  return new Date(b.created_at) - new Date(a.created_at);
+  return taskStart(a) - taskStart(b);
 }
 
 function splitTasks() {
@@ -1145,6 +1145,16 @@ async function gPushArchiveToggle(sbTask) {
   }
 }
 
+function gTaskDataEqual(sbTask, conv) {
+  return sbTask.title === conv.title
+    && (sbTask.tag || null) === (conv.tag || null)
+    && sbTask.date_str === conv.date_str
+    && (conv.time_str == null || sbTask.time_str === conv.time_str)
+    && Number(sbTask.duration) === Number(conv.duration)
+    && (sbTask.memo || '') === (conv.memo || '')
+    && !!sbTask.archived === !!conv.archived;
+}
+
 async function syncWithGoogleTasks() {
   const listId = localStorage.getItem(LS_G_LIST_ID);
   if (!listId) { setMessage('Google Tasks: 同期リストが未選択です', 'error'); return; }
@@ -1166,7 +1176,7 @@ async function syncWithGoogleTasks() {
     const sbNoG = sbTasks.filter((t) => !t.google_task_id);
     const ops = [];
 
-    // 既存の紐付きタスクを照合
+    // 既存の紐付きタスクを照合: Google の更新時刻が新しければアプリを上書き
     for (const sbTask of sbWithG) {
       const gTask = gMap.get(sbTask.google_task_id);
       if (!gTask) {
@@ -1176,15 +1186,21 @@ async function syncWithGoogleTasks() {
       }
       const sbTime = new Date(sbTask.updated_at).getTime();
       const gTime = gTask.updated ? new Date(gTask.updated).getTime() : 0;
-      if (sbTime >= gTime) {
-        await gPatchTask(listId, gTask.id, sbToGtask(sbTask));
+      const conv = gtaskToSb(gTask);
+      if (gTime > sbTime) {
+        // Google が新しい → アプリのタスクを最新情報で上書き (内容差分ありの場合のみ)
+        if (!gTaskDataEqual(sbTask, conv)) {
+          ops.push(sbClient.from('tasks').update({
+            title: conv.title, tag: conv.tag, date_str: conv.date_str,
+            time_str: conv.time_str, duration: conv.duration, memo: conv.memo,
+            archived: conv.archived,
+          }).eq('id', sbTask.id));
+        }
       } else {
-        const conv = gtaskToSb(gTask);
-        ops.push(sbClient.from('tasks').update({
-          title: conv.title, tag: conv.tag, date_str: conv.date_str,
-          time_str: conv.time_str, duration: conv.duration, memo: conv.memo,
-          archived: conv.archived,
-        }).eq('id', sbTask.id));
+        // Supabase が新しい/同時刻 → Google へ送信 (内容差分ありの場合のみ)
+        if (!gTaskDataEqual(sbTask, conv)) {
+          await gPatchTask(listId, gTask.id, sbToGtask(sbTask));
+        }
       }
       gMap.delete(sbTask.google_task_id);
     }
