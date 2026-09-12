@@ -337,6 +337,10 @@ function compareTasks(a, b) {
   return taskStart(a) - taskStart(b);
 }
 
+function compareTasksDesc(a, b) {
+  return taskStart(b) - taskStart(a);
+}
+
 function splitTasks() {
   const pending = [];
   const archived = [];
@@ -346,7 +350,7 @@ function splitTasks() {
     else pending.push(t);
   }
   pending.sort(compareTasks);
-  archived.sort(compareTasks);
+  archived.sort(compareTasksDesc);
   return { pending, archived };
 }
 
