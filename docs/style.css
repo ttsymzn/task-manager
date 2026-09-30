@@ -165,6 +165,27 @@ html, body {
   padding: 10px;
 }
 
+.help-toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-bottom: 6px;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.help-toggle:hover { color: var(--accent); }
+
+.help-toggle-mark {
+  display: inline-block;
+  color: var(--accent);
+  transition: transform 0.15s;
+}
+
+.help-toggle[aria-expanded="true"] .help-toggle-mark { transform: rotate(90deg); }
+
 .help {
   color: var(--fg-dim);
   white-space: pre-wrap;
@@ -581,13 +602,26 @@ html, body {
 .pane-row {
   flex: 1;
   display: flex;
+  flex-direction: column;
   gap: 10px;
   min-height: 0;
+}
+
+/* 編集中はメモ欄を画面下端まで広げ、タスク一覧はその下にスクロールで表示 */
+.term.editing {
+  height: auto;
+  min-height: 100vh;
+}
+
+.term.editing .pane-row {
+  flex: 0 0 auto;
+  height: 70vh;
 }
 
 .pane-bottom {
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 .pane-bottom .pane-body {
@@ -761,9 +795,8 @@ mark.hit {
 .mobile-toolbar { display: none; }
 
 @media (pointer: coarse) {
-  .help { display: none; }
-
-  .pane-row { flex-direction: column; }
+  .help,
+  .help-toggle { display: none !important; }
 
   #pane-pending,
   #pane-archived { display: none; }

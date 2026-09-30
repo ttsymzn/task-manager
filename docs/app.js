@@ -61,6 +61,8 @@ const els = {
   memoEditArea: document.getElementById('memo-edit-area'),
   memoPreview: document.getElementById('memo-preview'),
   memoPreviewBtn: document.getElementById('memo-preview-btn'),
+  helpToggle: document.getElementById('help-toggle'),
+  helpText: document.getElementById('help-text'),
   inputBackdrop: document.getElementById('input-backdrop'),
   searchline: document.getElementById('searchline'),
   searchInput: document.getElementById('search-input'),
@@ -747,6 +749,20 @@ function renderMemoBackdrop() {
 
 let memoPreviewMode = false;
 
+// メモ欄の高さを、上部ペインがブラウザの表示領域の下端にちょうど収まるように合わせる
+function fitMemoHeight() {
+  if (!state.editingId) return;
+  const target = memoPreviewMode ? els.memoPreview : els.memoInput;
+  const paneTop = els.memoSection.closest('.pane');
+  const termPadBottom = parseFloat(getComputedStyle(els.appRoot).paddingBottom) || 0;
+  const rect = target.getBoundingClientRect();
+  const below = paneTop.getBoundingClientRect().bottom - rect.bottom;
+  const top = rect.top + window.scrollY;
+  const h = Math.max(160, Math.floor(window.innerHeight - termPadBottom - below - top));
+  els.memoInput.style.height = h + 'px';
+  els.memoPreview.style.height = h + 'px';
+}
+
 function setMemoPreviewMode(on) {
   memoPreviewMode = on;
   if (on) {
@@ -760,6 +776,7 @@ function setMemoPreviewMode(on) {
     els.memoPreview.classList.add('hidden');
     els.memoPreviewBtn.textContent = 'preview';
   }
+  fitMemoHeight();
 }
 
 function enterEditMode(task) {
@@ -768,6 +785,7 @@ function enterEditMode(task) {
   els.prompt.textContent = '(edit)$';
   els.editFlag.classList.remove('hidden');
   els.memoSection.classList.remove('hidden');
+  els.appRoot.classList.add('editing');
   els.memoInput.value = task.memo || '';
   setMemoPreviewMode(false);
   setMessage('');
@@ -803,6 +821,9 @@ function exitEditMode() {
   els.prompt.textContent = '$';
   els.editFlag.classList.add('hidden');
   els.memoSection.classList.add('hidden');
+  els.appRoot.classList.remove('editing');
+  els.memoInput.style.height = '';
+  els.memoPreview.style.height = '';
   els.memoInput.value = '';
   renderInputBackdrop();
   renderMemoBackdrop();
@@ -1353,6 +1374,13 @@ els.memoPreviewBtn.addEventListener('click', () => {
   setMemoPreviewMode(!memoPreviewMode);
   if (!memoPreviewMode) els.memoInput.focus();
 });
+els.helpToggle.addEventListener('click', () => {
+  const open = els.helpText.classList.toggle('hidden') === false;
+  els.helpToggle.setAttribute('aria-expanded', String(open));
+  fitMemoHeight();
+});
+window.addEventListener('resize', fitMemoHeight);
+
 els.memoInput.addEventListener('scroll', () => {
   els.memoBackdrop.scrollTop = els.memoInput.scrollTop;
   els.memoBackdrop.scrollLeft = els.memoInput.scrollLeft;

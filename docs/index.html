@@ -44,7 +44,8 @@
         <span class="user-badge"><span id="user-email"></span><button type="button" id="logout-btn" class="tool-btn small">ログアウト</button></span>
       </div>
       <div class="pane-body">
-        <div class="help">
+        <button type="button" id="help-toggle" class="help-toggle" aria-expanded="false" aria-controls="help-text"><span class="help-toggle-mark" id="help-toggle-mark">＞</span> help</button>
+        <div class="help hidden" id="help-text">
 usage: &lt;タスク名...&gt; [-t &lt;タグ&gt;] [-d &lt;YYYYMMDD&gt;] [-h &lt;HHMM&gt;] [所要時間h]
 example: ミーティング会議 -t 会議 -d 20260903 -h 1000 0.5
 省略時デフォルト: タグ=なし / 日付=当日 / 時刻=現在時刻 / 所要時間=0
