@@ -689,6 +689,39 @@ html, body {
   color: var(--red);
 }
 
+.task-row.archived .title,
+.task-row.archived .time,
+.task-row.archived .date {
+  color: var(--fg-dim);
+}
+
+.list-divider {
+  color: var(--fg-dim);
+  padding: 6px 10px 2px;
+  font-size: 12px;
+}
+
+.view-filter {
+  display: flex;
+  gap: 12px;
+  color: var(--fg);
+  font-weight: normal;
+  font-size: 12px;
+}
+
+.view-filter label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.view-filter input {
+  accent-color: var(--accent);
+  margin: 0;
+  cursor: pointer;
+}
+
 mark.hit {
   background: #ffd166;
   color: #050603;
@@ -798,11 +831,8 @@ mark.hit {
   .help,
   .help-toggle { display: none !important; }
 
-  #pane-pending,
-  #pane-archived { display: none; }
-
-  #pane-pending.mobile-visible,
-  #pane-archived.mobile-visible { display: flex; }
+  /* モバイルでは上部タブで表示を切り替えるため、ヘッダーのチェックボックスは隠す */
+  .view-filter { display: none; }
 
   .mobile-pane-tabs {
     display: flex;

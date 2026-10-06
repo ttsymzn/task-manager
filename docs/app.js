@@ -25,10 +25,22 @@ function renderMarkdown(text, query) {
   return html;
 }
 
+// 表示フィルタ: pending(未完了のみ) / all(両方) / archived(アーカイブのみ)
+const VIEW_FILTERS = ['pending', 'all', 'archived'];
+const LS_VIEW_FILTER = 'view_filter';
+
+function loadViewFilter() {
+  try {
+    const v = localStorage.getItem(LS_VIEW_FILTER);
+    if (VIEW_FILTERS.includes(v)) return v;
+  } catch (_) { /* ignore */ }
+  return 'all';
+}
+
 const state = {
   tasks: [],
   editingId: null,
-  activePane: 'pending',
+  viewFilter: loadViewFilter(),
   selectedIndex: 0,
   searchQuery: '',
 };
@@ -49,12 +61,12 @@ const els = {
   prompt: document.getElementById('prompt'),
   editFlag: document.getElementById('edit-flag'),
   msg: document.getElementById('msg'),
-  pendingList: document.getElementById('pending-list'),
-  archivedList: document.getElementById('archived-list'),
+  taskList: document.getElementById('task-list'),
+  tasksCount: document.getElementById('tasks-count'),
   pendingCount: document.getElementById('pending-count'),
   archivedCount: document.getElementById('archived-count'),
-  panePending: document.getElementById('pane-pending'),
-  paneArchived: document.getElementById('pane-archived'),
+  filterPending: document.getElementById('filter-pending'),
+  filterArchived: document.getElementById('filter-archived'),
   memoSection: document.getElementById('memo-section'),
   memoInput: document.getElementById('memo-input'),
   memoBackdrop: document.getElementById('memo-backdrop'),
@@ -67,9 +79,9 @@ const els = {
   searchline: document.getElementById('searchline'),
   searchInput: document.getElementById('search-input'),
   searchStatus: document.getElementById('search-status'),
-  mobTabPending: document.getElementById('mobile-tab-pending'),
-  mobTabArchived: document.getElementById('mobile-tab-archived'),
+  mobTabs: document.querySelectorAll('.mobile-tab[data-filter]'),
   mobCountPending: document.getElementById('mobile-count-pending'),
+  mobCountAll: document.getElementById('mobile-count-all'),
   mobCountArchived: document.getElementById('mobile-count-archived'),
   mobUp: document.getElementById('mob-up'),
   mobDown: document.getElementById('mob-down'),
@@ -356,6 +368,28 @@ function splitTasks() {
   return { pending, archived };
 }
 
+// 現在の表示フィルタで見えるタスク(all のときは未完了→アーカイブの順に連結)
+function visibleTasks() {
+  const { pending, archived } = splitTasks();
+  if (state.viewFilter === 'pending') return { pending, archived, visible: pending };
+  if (state.viewFilter === 'archived') return { pending, archived, visible: archived };
+  return { pending, archived, visible: [...pending, ...archived] };
+}
+
+function setViewFilter(filter) {
+  if (!VIEW_FILTERS.includes(filter) || filter === state.viewFilter) return;
+  state.viewFilter = filter;
+  state.selectedIndex = 0;
+  try { localStorage.setItem(LS_VIEW_FILTER, filter); } catch (_) { /* ignore */ }
+  render();
+}
+
+function shiftViewFilter(delta) {
+  const i = VIEW_FILTERS.indexOf(state.viewFilter);
+  const next = Math.max(0, Math.min(VIEW_FILTERS.length - 1, i + delta));
+  setViewFilter(VIEW_FILTERS[next]);
+}
+
 function setMessage(text, type) {
   els.msg.textContent = text || '';
   els.msg.className = 'msg' + (type ? ' ' + type : '');
@@ -372,7 +406,7 @@ function buildCommandString(task) {
 // レンダリング
 // =========================================================
 
-function renderList(container, tasks, paneName, isPending) {
+function renderList(container, tasks) {
   container.innerHTML = '';
   if (tasks.length === 0) {
     const empty = document.createElement('div');
@@ -382,18 +416,25 @@ function renderList(container, tasks, paneName, isPending) {
     return;
   }
   const now = new Date();
+  const showDivider = state.viewFilter === 'all' && tasks.some((t) => !t.archived);
   tasks.forEach((task, idx) => {
-    const row = document.createElement('div');
-    const overdue = isPending && taskStart(task) <= now;
-    row.className = 'task-row' + (overdue ? ' overdue' : '');
-    if (state.activePane === paneName && state.selectedIndex === idx) {
-      row.classList.add('selected');
+    if (showDivider && task.archived && (idx === 0 || !tasks[idx - 1].archived)) {
+      const divider = document.createElement('div');
+      divider.className = 'list-divider';
+      divider.textContent = '-- archived --';
+      container.appendChild(divider);
     }
+
+    const selected = state.selectedIndex === idx;
+    const row = document.createElement('div');
+    const overdue = !task.archived && taskStart(task) <= now;
+    row.className = 'task-row' + (overdue ? ' overdue' : '') + (task.archived ? ' archived' : '');
+    if (selected) row.classList.add('selected');
     row.dataset.id = task.id;
 
     const cursor = document.createElement('span');
     cursor.className = 'cursor';
-    cursor.textContent = (state.activePane === paneName && state.selectedIndex === idx) ? '>' : '';
+    cursor.textContent = selected ? '>' : '';
 
     const title = document.createElement('span');
     title.className = 'title';
@@ -426,7 +467,6 @@ function renderList(container, tasks, paneName, isPending) {
 
     row.append(cursor, title, tag, date, time, created, updated);
     row.addEventListener('click', () => {
-      state.activePane = paneName;
       state.selectedIndex = idx;
       if (!isMobile()) {
         els.input.blur();
@@ -435,7 +475,7 @@ function renderList(container, tasks, paneName, isPending) {
     });
     container.appendChild(row);
 
-    if (state.activePane === paneName && state.selectedIndex === idx && task.memo) {
+    if (selected && task.memo) {
       const peek = document.createElement('div');
       peek.className = 'memo-peek';
       peek.innerHTML = renderMarkdown(task.memo, state.searchQuery);
@@ -445,39 +485,35 @@ function renderList(container, tasks, paneName, isPending) {
 }
 
 function render() {
-  const { pending, archived } = splitTasks();
+  const { pending, archived, visible } = visibleTasks();
+  els.tasksCount.textContent = `(${visible.length})`;
   els.pendingCount.textContent = `(${pending.length})`;
   els.archivedCount.textContent = `(${archived.length})`;
+  els.filterPending.checked = state.viewFilter !== 'archived';
+  els.filterArchived.checked = state.viewFilter !== 'pending';
 
-  if (state.activePane === 'pending') {
-    state.selectedIndex = clamp(state.selectedIndex, pending.length);
-  } else {
-    state.selectedIndex = clamp(state.selectedIndex, archived.length);
-  }
+  state.selectedIndex = clamp(state.selectedIndex, visible.length);
 
-  renderList(els.pendingList, pending, 'pending', true);
-  renderList(els.archivedList, archived, 'archived', false);
+  renderList(els.taskList, visible);
 
   if (state.searchQuery) {
-    els.searchStatus.textContent = `${pending.length + archived.length}件ヒット`;
+    els.searchStatus.textContent = `${visible.length}件ヒット`;
   } else {
     els.searchStatus.textContent = '';
   }
 
   if (isMobile()) {
-    els.panePending.classList.toggle('mobile-visible', state.activePane === 'pending');
-    els.paneArchived.classList.toggle('mobile-visible', state.activePane === 'archived');
-    els.mobTabPending.classList.toggle('active', state.activePane === 'pending');
-    els.mobTabArchived.classList.toggle('active', state.activePane === 'archived');
+    els.mobTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.filter === state.viewFilter));
     els.mobCountPending.textContent = `(${pending.length})`;
+    els.mobCountAll.textContent = `(${pending.length + archived.length})`;
     els.mobCountArchived.textContent = `(${archived.length})`;
     els.mobEdit.textContent = state.editingId ? '保存' : 'edit';
-    els.mobArchive.textContent = state.activePane === 'archived' ? 'pend' : 'arch';
+    els.mobArchive.textContent = visible[state.selectedIndex]?.archived ? 'pend' : 'arch';
     const inSearch = !els.searchline.classList.contains('hidden');
     els.mobSearch.textContent = (state.editingId || inSearch) ? 'Esc' : '/';
   }
 
-  return { pending, archived };
+  return { pending, archived, visible };
 }
 
 function clamp(idx, len) {
@@ -488,9 +524,12 @@ function clamp(idx, len) {
 }
 
 function currentSelectedTask() {
-  const { pending, archived } = splitTasks();
-  const list = state.activePane === 'pending' ? pending : archived;
-  return list[state.selectedIndex] || null;
+  return visibleTasks().visible[state.selectedIndex] || null;
+}
+
+function moveSelection(delta) {
+  state.selectedIndex = clamp(state.selectedIndex + delta, visibleTasks().visible.length);
+  render();
 }
 
 // =========================================================
@@ -1505,24 +1544,16 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    const { pending, archived } = splitTasks();
-    const len = state.activePane === 'pending' ? pending.length : archived.length;
-    state.selectedIndex = clamp(state.selectedIndex + 1, len);
-    render();
+    moveSelection(1);
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    const { pending, archived } = splitTasks();
-    const len = state.activePane === 'pending' ? pending.length : archived.length;
-    state.selectedIndex = clamp(state.selectedIndex - 1, len);
-    render();
+    moveSelection(-1);
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault();
-    state.activePane = 'pending';
-    render();
+    shiftViewFilter(-1);
   } else if (e.key === 'ArrowRight') {
     e.preventDefault();
-    state.activePane = 'archived';
-    render();
+    shiftViewFilter(1);
   } else if (e.key === 'Enter') {
     e.preventDefault();
     const task = currentSelectedTask();
@@ -1548,33 +1579,35 @@ window.addEventListener('keydown', (e) => {
 // モバイルツールバー
 // =========================================================
 
-els.mobTabPending.addEventListener('click', () => {
-  state.activePane = 'pending';
-  render();
-});
-
-els.mobTabArchived.addEventListener('click', () => {
-  state.activePane = 'archived';
-  render();
+els.mobTabs.forEach((tab) => {
+  tab.addEventListener('click', () => setViewFilter(tab.dataset.filter));
 });
 
 els.mobUp.addEventListener('click', () => {
-  const { pending, archived } = splitTasks();
-  const len = state.activePane === 'pending' ? pending.length : archived.length;
-  state.selectedIndex = clamp(state.selectedIndex - 1, len);
-  render();
-  const list = state.activePane === 'pending' ? els.pendingList : els.archivedList;
-  list.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
+  moveSelection(-1);
+  els.taskList.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
 });
 
 els.mobDown.addEventListener('click', () => {
-  const { pending, archived } = splitTasks();
-  const len = state.activePane === 'pending' ? pending.length : archived.length;
-  state.selectedIndex = clamp(state.selectedIndex + 1, len);
-  render();
-  const list = state.activePane === 'pending' ? els.pendingList : els.archivedList;
-  list.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
+  moveSelection(1);
+  els.taskList.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
 });
+
+// ペインヘッダーのチェックボックス: 両方オン=all、片方のみ=その種類。
+// 両方オフにはできない(最後の1つを外そうとしたらもう一方に切り替える)
+function onFilterCheckboxChange(changed, other, otherFilter) {
+  if (!changed.checked && !other.checked) {
+    setViewFilter(otherFilter);
+    render();
+    return;
+  }
+  const p = els.filterPending.checked;
+  const a = els.filterArchived.checked;
+  setViewFilter(p && a ? 'all' : (p ? 'pending' : 'archived'));
+}
+
+els.filterPending.addEventListener('change', () => onFilterCheckboxChange(els.filterPending, els.filterArchived, 'archived'));
+els.filterArchived.addEventListener('change', () => onFilterCheckboxChange(els.filterArchived, els.filterPending, 'pending'));
 
 els.mobEdit.addEventListener('click', () => {
   if (state.editingId) {
