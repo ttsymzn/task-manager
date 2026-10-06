@@ -538,6 +538,7 @@ function focusTaskPane() {
 function moveSelection(delta) {
   state.selectedIndex = clamp(state.selectedIndex + delta, visibleTasks().visible.length);
   render();
+  els.taskList.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
 }
 
 // =========================================================
@@ -1649,12 +1650,10 @@ els.mobTabs.forEach((tab) => {
 
 els.mobUp.addEventListener('click', () => {
   moveSelection(-1);
-  els.taskList.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
 });
 
 els.mobDown.addEventListener('click', () => {
   moveSelection(1);
-  els.taskList.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
 });
 
 // ペインヘッダーのチェックボックス: 両方オン=all、片方のみ=その種類。
