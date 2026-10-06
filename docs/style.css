@@ -624,6 +624,15 @@ html, body {
   min-height: 0;
 }
 
+.pane-bottom:focus {
+  outline: none;
+}
+
+.pane-bottom:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .pane-bottom .pane-body {
   overflow-y: auto;
   flex: 1;
