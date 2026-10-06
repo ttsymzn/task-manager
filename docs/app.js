@@ -550,6 +550,7 @@ async function submitCommand() {
   const command = els.input.value.trim();
   if (!command) return;
   const isEdit = !!state.editingId;
+  cancelMemoAutosave();
   try {
     const parsed = parseCommand(command);
     if (isEdit) {
@@ -819,6 +820,7 @@ function setMemoPreviewMode(on) {
 }
 
 function enterEditMode(task) {
+  cancelMemoAutosave();
   state.editingId = task.id;
   els.input.value = buildCommandString(task);
   els.prompt.textContent = '(edit)$';
@@ -854,6 +856,7 @@ function enterEditMode(task) {
 }
 
 function exitEditMode() {
+  cancelMemoAutosave();
   state.editingId = null;
   setMemoPreviewMode(false);
   els.input.value = '';
@@ -867,6 +870,49 @@ function exitEditMode() {
   renderInputBackdrop();
   renderMemoBackdrop();
   render();
+}
+
+// =========================================================
+// メモ自動保存 (入力が止まって一定時間後にメモだけを保存)
+// =========================================================
+
+const MEMO_AUTOSAVE_DELAY_MS = 10000;
+let memoAutosaveTimer = null;
+
+function cancelMemoAutosave() {
+  clearTimeout(memoAutosaveTimer);
+  memoAutosaveTimer = null;
+}
+
+function scheduleMemoAutosave() {
+  cancelMemoAutosave();
+  if (!state.editingId) return;
+  memoAutosaveTimer = setTimeout(autosaveMemo, MEMO_AUTOSAVE_DELAY_MS);
+}
+
+async function autosaveMemo() {
+  memoAutosaveTimer = null;
+  const id = state.editingId;
+  if (!id) return;
+  const memo = els.memoInput.value;
+  const task = state.tasks.find((t) => t.id === id);
+  if (task && task.memo === memo) return;
+  const { data, error } = await sbClient
+    .from('tasks')
+    .update({ memo })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) {
+    setMessage(`autosave error: ${error.message}`, 'error');
+    return;
+  }
+  const idx = state.tasks.findIndex((t) => t.id === id);
+  if (idx !== -1) state.tasks[idx] = data;
+  if (state.editingId === id) {
+    setMessage(`autosaved: ${new Date().toLocaleTimeString()}`, 'ok');
+  }
+  await gPushTaskUpdate(data);
 }
 
 // =========================================================
@@ -1407,6 +1453,7 @@ els.input.addEventListener('scroll', () => {
 els.memoInput.addEventListener('input', () => {
   tryExpandSnippet(els.memoInput);
   renderMemoBackdrop();
+  scheduleMemoAutosave();
 });
 
 els.memoPreviewBtn.addEventListener('click', () => {
