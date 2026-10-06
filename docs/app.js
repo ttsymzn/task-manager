@@ -859,8 +859,11 @@ function enterEditMode(task) {
       return;
     }
   }
-  els.input.focus();
-  els.input.select();
+  // 既定はメモ欄にフォーカスし、カーソルを末尾に置く
+  const end = els.memoInput.value.length;
+  els.memoInput.focus();
+  els.memoInput.setSelectionRange(end, end);
+  renderMemoBackdrop();
 }
 
 function exitEditMode() {
