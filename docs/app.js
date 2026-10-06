@@ -1621,10 +1621,10 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     const task = currentSelectedTask();
     if (task) toggleArchive(task);
-  } else if (e.key === 't' || e.key === 'T') {
+  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 't' || e.key === 'T' || e.code === 'KeyT')) {
     e.preventDefault();
     focusTaskPane();
-  } else if (e.key === 'c' || e.key === 'C') {
+  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'c' || e.key === 'C' || e.code === 'KeyC')) {
     e.preventDefault();
     els.input.focus();
   } else if (e.key === '/') {

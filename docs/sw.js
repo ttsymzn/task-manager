@@ -1,4 +1,4 @@
-const CACHE_NAME = 'task-manager-shell-v5';
+const CACHE_NAME = 'task-manager-shell-v6';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -35,7 +35,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    // HTTPキャッシュを経由せず常にサーバーへ確認し、更新をすぐ反映する
+    fetch(request, { cache: 'no-cache' })
       .then((response) => {
         if (response && response.ok) {
           const clone = response.clone();
