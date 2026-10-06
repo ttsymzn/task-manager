@@ -62,6 +62,7 @@ const els = {
   editFlag: document.getElementById('edit-flag'),
   msg: document.getElementById('msg'),
   taskList: document.getElementById('task-list'),
+  paneTasks: document.getElementById('pane-tasks'),
   tasksCount: document.getElementById('tasks-count'),
   pendingCount: document.getElementById('pending-count'),
   archivedCount: document.getElementById('archived-count'),
@@ -525,6 +526,13 @@ function clamp(idx, len) {
 
 function currentSelectedTask() {
   return visibleTasks().visible[state.selectedIndex] || null;
+}
+
+// # tasks ペインへ移動: フォーカスを移し、選択行を表示範囲に入れる
+function focusTaskPane() {
+  els.paneTasks.focus({ preventScroll: true });
+  els.paneTasks.scrollIntoView({ block: 'nearest' });
+  els.taskList.querySelector('.task-row.selected')?.scrollIntoView({ block: 'nearest' });
 }
 
 function moveSelection(delta) {
@@ -1613,6 +1621,12 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     const task = currentSelectedTask();
     if (task) toggleArchive(task);
+  } else if (e.key === 't' || e.key === 'T') {
+    e.preventDefault();
+    focusTaskPane();
+  } else if (e.key === 'c' || e.key === 'C') {
+    e.preventDefault();
+    els.input.focus();
   } else if (e.key === '/') {
     e.preventDefault();
     els.searchline.classList.remove('hidden');
