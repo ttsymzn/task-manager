@@ -466,7 +466,7 @@ function renderList(container, tasks) {
       updated.textContent = `更新:${formatDateTime(task.updated_at)}`;
     }
 
-    row.append(cursor, title, tag, date, time, created, updated);
+    row.append(cursor, date, title, tag, time, created, updated);
     row.addEventListener('click', () => {
       state.selectedIndex = idx;
       if (!isMobile()) {
