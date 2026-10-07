@@ -605,9 +605,17 @@ async function submitCommand() {
 }
 
 async function toggleArchive(task) {
+  await setArchived(task, !task.archived);
+}
+
+async function setArchived(task, archived) {
+  if (task.archived === archived) {
+    setMessage(archived ? `already archived: ${task.title}` : `already pending: ${task.title}`);
+    return;
+  }
   const { data, error } = await sbClient
     .from('tasks')
-    .update({ archived: !task.archived })
+    .update({ archived })
     .eq('id', task.id)
     .select()
     .single();
@@ -1621,10 +1629,14 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     const task = currentSelectedTask();
     if (task && confirm(`削除しますか?\n"${task.title}"`)) deleteTask(task);
-  } else if (e.key === 'a' || e.key === 'A') {
+  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
     e.preventDefault();
     const task = currentSelectedTask();
-    if (task) toggleArchive(task);
+    if (task) setArchived(task, true);
+  } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP')) {
+    e.preventDefault();
+    const task = currentSelectedTask();
+    if (task) setArchived(task, false);
   } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 't' || e.key === 'T' || e.code === 'KeyT')) {
     e.preventDefault();
     focusTaskPane();
