@@ -25,7 +25,7 @@ function renderMarkdown(text, query) {
   return html;
 }
 
-// 表示フィルタ: week(今週の未完了+アーカイブ) / pending(未完了のみ) / all(両方) / archived(アーカイブのみ)
+// 表示フィルタ: week(今週の未完了+アーカイブ、期限切れの未完了) / pending(未完了のみ) / all(両方) / archived(アーカイブのみ)
 const VIEW_FILTERS = ['week', 'pending', 'all', 'archived'];
 // week をデフォルトにしたのでキーを変えて保存済みの値をリセットする
 const LS_VIEW_FILTER = 'view_filter_v2';
@@ -239,6 +239,11 @@ function isThisWeek(task) {
   return task.date_str >= from && task.date_str <= to;
 }
 
+// week 表示の対象: 今週のタスク + 期限切れ(開始時刻を過ぎた)の未完了タスク
+function inWeekView(task) {
+  return isThisWeek(task) || (!task.archived && taskStart(task) <= new Date());
+}
+
 function nowTimeStr() {
   const now = new Date();
   return `${pad2(now.getHours())}${pad2(now.getMinutes())}`;
@@ -393,7 +398,7 @@ function splitTasks() {
 // 現在の表示フィルタで見えるタスク(all/week のときは未完了→アーカイブの順に連結)
 function visibleTasks() {
   const { pending, archived } = splitTasks();
-  const week = [...pending.filter(isThisWeek), ...archived.filter(isThisWeek)];
+  const week = [...pending.filter(inWeekView), ...archived.filter(inWeekView)];
   if (state.viewFilter === 'week') return { pending, archived, week, visible: week };
   if (state.viewFilter === 'pending') return { pending, archived, week, visible: pending };
   if (state.viewFilter === 'archived') return { pending, archived, week, visible: archived };
