@@ -1,4 +1,4 @@
-const CACHE_NAME = 'task-manager-shell-v10';
+const CACHE_NAME = 'task-manager-shell-v11';
 const SHELL_FILES = [
   './',
   './index.html',
