@@ -25,16 +25,17 @@ function renderMarkdown(text, query) {
   return html;
 }
 
-// 表示フィルタ: pending(未完了のみ) / all(両方) / archived(アーカイブのみ)
-const VIEW_FILTERS = ['pending', 'all', 'archived'];
-const LS_VIEW_FILTER = 'view_filter';
+// 表示フィルタ: week(今週の未完了+アーカイブ) / pending(未完了のみ) / all(両方) / archived(アーカイブのみ)
+const VIEW_FILTERS = ['week', 'pending', 'all', 'archived'];
+// week をデフォルトにしたのでキーを変えて保存済みの値をリセットする
+const LS_VIEW_FILTER = 'view_filter_v2';
 
 function loadViewFilter() {
   try {
     const v = localStorage.getItem(LS_VIEW_FILTER);
     if (VIEW_FILTERS.includes(v)) return v;
   } catch (_) { /* ignore */ }
-  return 'all';
+  return 'week';
 }
 
 const state = {
@@ -64,8 +65,10 @@ const els = {
   taskList: document.getElementById('task-list'),
   paneTasks: document.getElementById('pane-tasks'),
   tasksCount: document.getElementById('tasks-count'),
+  weekCount: document.getElementById('week-count'),
   pendingCount: document.getElementById('pending-count'),
   archivedCount: document.getElementById('archived-count'),
+  filterWeek: document.getElementById('filter-week'),
   filterPending: document.getElementById('filter-pending'),
   filterArchived: document.getElementById('filter-archived'),
   memoSection: document.getElementById('memo-section'),
@@ -81,6 +84,7 @@ const els = {
   searchInput: document.getElementById('search-input'),
   searchStatus: document.getElementById('search-status'),
   mobTabs: document.querySelectorAll('.mobile-tab[data-filter]'),
+  mobCountWeek: document.getElementById('mobile-count-week'),
   mobCountPending: document.getElementById('mobile-count-pending'),
   mobCountAll: document.getElementById('mobile-count-all'),
   mobCountArchived: document.getElementById('mobile-count-archived'),
@@ -216,6 +220,23 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 function todayDateStr() {
   const now = new Date();
   return `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}`;
+}
+
+function dateToStr(d) {
+  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
+}
+
+// 今週(今日を含む月曜〜日曜)の範囲を YYYYMMDD で返す
+function thisWeekRange() {
+  const now = new Date();
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  return { from: dateToStr(monday), to: dateToStr(sunday) };
+}
+
+function isThisWeek(task) {
+  const { from, to } = thisWeekRange();
+  return task.date_str >= from && task.date_str <= to;
 }
 
 function nowTimeStr() {
@@ -369,12 +390,14 @@ function splitTasks() {
   return { pending, archived };
 }
 
-// 現在の表示フィルタで見えるタスク(all のときは未完了→アーカイブの順に連結)
+// 現在の表示フィルタで見えるタスク(all/week のときは未完了→アーカイブの順に連結)
 function visibleTasks() {
   const { pending, archived } = splitTasks();
-  if (state.viewFilter === 'pending') return { pending, archived, visible: pending };
-  if (state.viewFilter === 'archived') return { pending, archived, visible: archived };
-  return { pending, archived, visible: [...pending, ...archived] };
+  const week = [...pending.filter(isThisWeek), ...archived.filter(isThisWeek)];
+  if (state.viewFilter === 'week') return { pending, archived, week, visible: week };
+  if (state.viewFilter === 'pending') return { pending, archived, week, visible: pending };
+  if (state.viewFilter === 'archived') return { pending, archived, week, visible: archived };
+  return { pending, archived, week, visible: [...pending, ...archived] };
 }
 
 function setViewFilter(filter) {
@@ -417,7 +440,7 @@ function renderList(container, tasks) {
     return;
   }
   const now = new Date();
-  const showDivider = state.viewFilter === 'all' && tasks.some((t) => !t.archived);
+  const showDivider = (state.viewFilter === 'all' || state.viewFilter === 'week') && tasks.some((t) => !t.archived);
   tasks.forEach((task, idx) => {
     if (showDivider && task.archived && (idx === 0 || !tasks[idx - 1].archived)) {
       const divider = document.createElement('div');
@@ -486,10 +509,12 @@ function renderList(container, tasks) {
 }
 
 function render() {
-  const { pending, archived, visible } = visibleTasks();
+  const { pending, archived, week, visible } = visibleTasks();
   els.tasksCount.textContent = `(${visible.length})`;
+  els.weekCount.textContent = `(${week.length})`;
   els.pendingCount.textContent = `(${pending.length})`;
   els.archivedCount.textContent = `(${archived.length})`;
+  els.filterWeek.checked = state.viewFilter === 'week';
   els.filterPending.checked = state.viewFilter !== 'archived';
   els.filterArchived.checked = state.viewFilter !== 'pending';
 
@@ -505,6 +530,7 @@ function render() {
 
   if (isMobile()) {
     els.mobTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.filter === state.viewFilter));
+    els.mobCountWeek.textContent = `(${week.length})`;
     els.mobCountPending.textContent = `(${pending.length})`;
     els.mobCountAll.textContent = `(${pending.length + archived.length})`;
     els.mobCountArchived.textContent = `(${archived.length})`;
@@ -1668,7 +1694,8 @@ els.mobDown.addEventListener('click', () => {
   moveSelection(1);
 });
 
-// ペインヘッダーのチェックボックス: 両方オン=all、片方のみ=その種類。
+// ペインヘッダーのチェックボックス: week オン=week、
+// それ以外は pending/archived の両方オン=all、片方のみ=その種類。
 // 両方オフにはできない(最後の1つを外そうとしたらもう一方に切り替える)
 function onFilterCheckboxChange(changed, other, otherFilter) {
   if (!changed.checked && !other.checked) {
@@ -1681,6 +1708,9 @@ function onFilterCheckboxChange(changed, other, otherFilter) {
   setViewFilter(p && a ? 'all' : (p ? 'pending' : 'archived'));
 }
 
+els.filterWeek.addEventListener('change', () => {
+  setViewFilter(els.filterWeek.checked ? 'week' : 'all');
+});
 els.filterPending.addEventListener('change', () => onFilterCheckboxChange(els.filterPending, els.filterArchived, 'archived'));
 els.filterArchived.addEventListener('change', () => onFilterCheckboxChange(els.filterArchived, els.filterPending, 'pending'));
 
