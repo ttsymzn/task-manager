@@ -95,3 +95,17 @@ create policy "delete own snippets" on public.snippets
 -- 既存の tasks テーブルに対して実行してください
 -- =========================================================
 alter table public.tasks add column if not exists google_task_id text;
+
+-- =========================================================
+-- Google Tasks 連携: リフレッシュトークン保管テーブル
+-- Edge Function (supabase/functions/google-oauth) が service role で読み書きします。
+-- RLS を有効にしてポリシーを作らないことで、ブラウザ (anon / authenticated) からは一切読めません。
+-- =========================================================
+create table if not exists public.google_tokens (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  refresh_token text not null,
+  scope text,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.google_tokens enable row level security;

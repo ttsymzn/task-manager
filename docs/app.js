@@ -191,7 +191,7 @@ function showApp(session) {
   fetchTasks();
   fetchSnippets();
   gUpdateUI();
-  gStartSyncTimer();
+  gInit();
   els.input.focus();
 }
 
@@ -204,6 +204,9 @@ function showAuth() {
   }
   state.tasks = [];
   gStopSyncTimer();
+  gClearToken();
+  gStartupSynced = false;
+  gUpdateUI();
 }
 
 sbClient.auth.onAuthStateChange((_event, session) => {
@@ -1092,15 +1095,22 @@ async function importCsvFile(file) {
 const GTASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const G_META_START = '[task-manager]';
 const G_META_END = '[/task-manager]';
-const LS_G_TOKEN = 'gtasks_token';
-const LS_G_EXPIRY = 'gtasks_expiry';
 const LS_G_LIST_ID = 'gtasks_list_id';
 const LS_G_INTERVAL = 'gtasks_interval';
 const LS_G_LAST_SYNC = 'gtasks_last_sync';
+// 旧方式 (ブラウザにアクセストークンを保存) のキー。起動時に削除する。
+const LS_G_LEGACY_KEYS = ['gtasks_token', 'gtasks_expiry'];
+// リフレッシュトークンを保管し、アクセストークンを発行する Edge Function
+const G_FUNCTION = 'google-oauth';
+const G_SCOPE = 'https://www.googleapis.com/auth/tasks';
 
-let gTokenClient = null;
+// gLinked: サーバー側にリフレッシュトークンが保管されている (= 連携済み)
+// アクセストークンは短命なのでメモリにのみ持ち、必要なときに Edge Function から取り直す
+let gLinked = false;
 let gAccessToken = null;
 let gTokenExpiry = 0;
+let gTokenPromise = null;
+let gStartupSynced = false;
 let gSyncTimer = null;
 let gSyncing = false;
 
@@ -1119,32 +1129,70 @@ const gels = {
 };
 
 function gIsConnected() {
-  return !!(gAccessToken && Date.now() < gTokenExpiry);
-}
-
-function gLoadFromStorage() {
-  gAccessToken = localStorage.getItem(LS_G_TOKEN) || null;
-  const exp = localStorage.getItem(LS_G_EXPIRY);
-  gTokenExpiry = exp ? parseInt(exp, 10) : 0;
-  if (gAccessToken && Date.now() >= gTokenExpiry) {
-    gAccessToken = null;
-    localStorage.removeItem(LS_G_TOKEN);
-    localStorage.removeItem(LS_G_EXPIRY);
-  }
+  return gLinked;
 }
 
 function gSaveToken(token, expiresIn) {
   gAccessToken = token;
   gTokenExpiry = Date.now() + (parseInt(expiresIn, 10) - 60) * 1000;
-  localStorage.setItem(LS_G_TOKEN, token);
-  localStorage.setItem(LS_G_EXPIRY, String(gTokenExpiry));
 }
 
 function gClearToken() {
+  gLinked = false;
   gAccessToken = null;
   gTokenExpiry = 0;
-  localStorage.removeItem(LS_G_TOKEN);
-  localStorage.removeItem(LS_G_EXPIRY);
+}
+
+async function gInvoke(action, extra = {}) {
+  const { data, error } = await sbClient.functions.invoke(G_FUNCTION, { body: { action, ...extra } });
+  if (error) {
+    let body = null;
+    try { body = await error.context.json(); } catch (_) { /* ignore */ }
+    const err = new Error((body && (body.detail || body.error)) || error.message);
+    err.code = body && body.error;
+    throw err;
+  }
+  return data;
+}
+
+// 有効なアクセストークンを用意する。期限切れ・force 時は Edge Function から取り直す
+async function gEnsureToken(force = false) {
+  if (!force && gAccessToken && Date.now() < gTokenExpiry) return gAccessToken;
+  if (!gTokenPromise) {
+    gTokenPromise = gInvoke('token')
+      .then((data) => {
+        gLinked = true;
+        gSaveToken(data.access_token, data.expires_in);
+        return gAccessToken;
+      })
+      .catch((err) => {
+        if (err.code === 'not_connected') {
+          gClearToken();
+          gStopSyncTimer();
+          gUpdateUI();
+          throw new Error('Google Tasks と未接続です。google sync から接続してください。');
+        }
+        throw err;
+      })
+      .finally(() => { gTokenPromise = null; });
+  }
+  return gTokenPromise;
+}
+
+// アプリ表示時に呼ぶ。連携済みなら操作なしでトークンを取得し、同期を開始する
+async function gInit() {
+  try {
+    await gEnsureToken();
+  } catch (err) {
+    if (gLinked) setMessage(`Google Tasks エラー: ${err.message}`, 'error');
+    return;
+  }
+  gUpdateUI();
+  gStartSyncTimer();
+  if (!gStartupSynced && localStorage.getItem(LS_G_LIST_ID)) {
+    gStartupSynced = true;
+    await syncWithGoogleTasks();
+  }
 }
 
 function gStopSyncTimer() {
@@ -1159,19 +1207,20 @@ function gStartSyncTimer() {
   }
 }
 
-async function gFetch(url, options = {}) {
+async function gFetch(url, options = {}, retried = false) {
+  const token = await gEnsureToken();
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${gAccessToken}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
   });
-  if (res.status === 401) {
-    gClearToken();
-    gUpdateUI();
-    throw new Error('Googleトークンが期限切れです。再接続してください。');
+  if (res.status === 401 && !retried) {
+    // 期限前に失効した場合は一度だけ取り直して再試行
+    await gEnsureToken(true);
+    return gFetch(url, options, true);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -1441,18 +1490,30 @@ async function gConnect() {
     setMessage('error: Google Identity Services が読み込めませんでした', 'error');
     return;
   }
-  gTokenClient = window.google.accounts.oauth2.initTokenClient({
+  // 認可コードを取得し、Edge Function でリフレッシュトークンと交換してサーバー側に保管する。
+  // 初回のみの操作で、以降は起動時に自動でアクセストークンを取得できる。
+  const codeClient = window.google.accounts.oauth2.initCodeClient({
     client_id: window.GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/tasks',
+    scope: G_SCOPE,
+    ux_mode: 'popup',
+    // リフレッシュトークンを確実に発行させるため毎回同意画面を出す
+    prompt: 'consent',
     callback: async (resp) => {
       if (resp.error) { setMessage(`Google 認証エラー: ${resp.error}`, 'error'); return; }
-      gSaveToken(resp.access_token, resp.expires_in);
+      try {
+        const data = await gInvoke('exchange', { code: resp.code });
+        gLinked = true;
+        gSaveToken(data.access_token, data.expires_in);
+      } catch (err) {
+        setMessage(`Google 認証エラー: ${err.message}`, 'error');
+        return;
+      }
       await gLoadListsAndUpdateUI();
       gStartSyncTimer();
       await syncWithGoogleTasks();
     },
   });
-  gTokenClient.requestAccessToken({ prompt: gIsConnected() ? '' : undefined });
+  codeClient.requestCode();
 }
 
 gels.btn.addEventListener('click', () => {
@@ -1466,7 +1527,13 @@ gels.btn.addEventListener('click', () => {
 
 gels.connectBtn.addEventListener('click', gConnect);
 
-gels.disconnectBtn.addEventListener('click', () => {
+gels.disconnectBtn.addEventListener('click', async () => {
+  try {
+    await gInvoke('disconnect');
+  } catch (err) {
+    setMessage(`Google Tasks 切断エラー: ${err.message}`, 'error');
+    return;
+  }
   gClearToken();
   gStopSyncTimer();
   gUpdateUI();
@@ -1487,7 +1554,7 @@ gels.syncNowBtn.addEventListener('click', syncWithGoogleTasks);
 
 gels.closeBtn.addEventListener('click', () => { gels.panel.classList.add('hidden'); });
 
-gLoadFromStorage();
+LS_G_LEGACY_KEYS.forEach((k) => { try { localStorage.removeItem(k); } catch (_) { /* ignore */ } });
 
 // =========================================================
 // イベント配線

@@ -15,4 +15,5 @@ window.SUPABASE_ANON_KEY = 'sb_publishable_NjmbX9eTVdH9blKPDfGbGQ_6mLnxUwN';
 //      - 承認済みのJavaScript生成元: このアプリのURL (例: https://yourdomain.github.io)
 //      - ローカル開発の場合は http://localhost や http://127.0.0.1 も追加
 //   4. 作成されたクライアントIDをここに貼り付けてください
+//   5. クライアントシークレットはここには書かず、Supabase の Edge Function のシークレットに設定してください (README 参照)
 window.GOOGLE_CLIENT_ID = '697621119828-5d26mt2ofhsv9ros2qh4qujls1sqafje.apps.googleusercontent.com'; // 例: '1234567890-xxxxxxxxxxxx.apps.googleusercontent.com'
