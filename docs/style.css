@@ -1,5 +1,35 @@
 * { box-sizing: border-box; }
 
+/*
+ * 記号用フォント: ①や→などの記号は Consolas などの欧文等幅フォントでは
+ * 半角幅で描画されたり別フォントへフォールバックしたりして小さく見えるため、
+ * 該当する Unicode 範囲だけ日本語フォントで表示する(英数字は Consolas のまま)。
+ */
+@font-face {
+  font-family: "JP Symbols";
+  src: local("BIZ UDGothic"), local("BIZUDGothic-Regular"),
+       local("Yu Gothic UI"), local("YuGothicUI-Regular"),
+       local("Yu Gothic Regular"), local("YuGothic-Regular"),
+       local("Meiryo"),
+       local("MS Gothic"), local("MS-Gothic"),
+       local("Hiragino Sans W3"), local("HiraginoSans-W3"),
+       local("Hiragino Kaku Gothic ProN W3"), local("HiraKakuProN-W3"),
+       local("Noto Sans CJK JP Regular"), local("NotoSansCJKjp-Regular"),
+       local("Noto Sans JP Regular"), local("NotoSansJP-Regular"),
+       local("Noto Sans JP");
+  unicode-range:
+    U+203B,          /* ※ */
+    U+2100-214F,     /* ℃ № ℡ など */
+    U+2150-218F,     /* Ⅰ Ⅱ ⅰ などのローマ数字 */
+    U+2190-21FF,     /* → ← ⇒ などの矢印 */
+    U+2200-22FF,     /* ∀ ∴ ≒ などの数学記号 */
+    U+2460-24FF,     /* ① ② ⑴ ⒜ などの囲み文字 */
+    U+2500-257F,     /* ─ │ ┣ などの罫線 */
+    U+25A0-25FF,     /* ■ □ ▲ ● ◎ などの図形 */
+    U+2600-27BF,     /* ★ ☆ ☑ ✓ などの記号 */
+    U+3200-33FF;     /* ㈱ ㊤ ㍉ などの囲み CJK 文字・単位 */
+}
+
 :root {
   --bg: #0c0f0a;
   --pane-bg: #0a0d09;
@@ -16,7 +46,7 @@ html, body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Consolas", "Cascadia Mono", "Courier New", monospace;
+  font-family: "JP Symbols", "Consolas", "Cascadia Mono", "Courier New", monospace;
   font-size: 14px;
 }
 
